@@ -1,5 +1,5 @@
 server:
-  port: 8005
+  port: ${SERVER_PORT:8005}
 
 spring:
   application:
@@ -7,20 +7,20 @@ spring:
   
   # PostgreSQL DataSource
   datasource:
-    url: jdbc:postgresql://localhost:5432/chatdb1
-    username: ishimwe
-    password: 2025New+
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/chatdb1}
+    username: ${DB_USERNAME:ishimwe}
+    password: ${DB_PASSWORD:2025New+}
     driver-class-name: org.postgresql.Driver
     hikari:
-      maximum-pool-size: 10
-      minimum-idle: 5
-      connection-timeout: 30000
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:10}
+      minimum-idle: ${DB_POOL_MIN_IDLE:5}
+      connection-timeout: ${DB_CONNECTION_TIMEOUT:30000}
   
   # JPA / Hibernate Configuration
   jpa:
     hibernate:
-      ddl-auto: update  # Options: none | validate | update | create | create-drop
-    show-sql: true
+      ddl-auto: ${DDL_AUTO:update}
+    show-sql: ${SHOW_SQL:true}
     properties:
       hibernate:
         format_sql: true
@@ -39,6 +39,6 @@ spring:
 # Logging for debugging
 logging:
   level:
-    com.example.chat_service: DEBUG
-    org.hibernate.SQL: DEBUG
-    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    com.example.chat_service: ${LOG_LEVEL_APP:DEBUG}
+    org.hibernate.SQL: ${LOG_LEVEL_SQL:DEBUG}
+    org.hibernate.type.descriptor.sql.BasicBinder: ${LOG_LEVEL_TRACE:TRACE}
