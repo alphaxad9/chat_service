@@ -1,0 +1,1 @@
+// com/example/chat_service/domain/post/repositories/PostQueryRepository.java
