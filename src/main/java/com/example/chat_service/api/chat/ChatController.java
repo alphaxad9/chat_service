@@ -1,4 +1,4 @@
-package com.example.chat_service.controller;
+package com.example.chat_service.api.chat;
 
 import org.springframework.web.bind.annotation.*;
 import java.util.Map;

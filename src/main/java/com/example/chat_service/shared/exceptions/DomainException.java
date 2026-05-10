@@ -1,0 +1,1 @@
+// chat_service/src/main/java/com/example/chat_service/shared/exceptions/DomainException.java
