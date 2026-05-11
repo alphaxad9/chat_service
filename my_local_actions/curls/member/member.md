@@ -27,6 +27,16 @@ curl -X POST http://127.0.0.1:8005/api/rooms/71885bbe-3f48-42b6-90e7-f988af5231d
   }' | jq
 
 
+# 1. Leave room (pretty JSON with jq)
+curl -s -X DELETE \
+  http://127.0.0.1:8005/api/members/a33a1703-2fec-4502-8189-60aadf1961fc/leave \
+  --cookie "access_token=YOUR_ACCESS_TOKEN" | jq
+
+
+# 2. Get room members (pretty JSON with jq)
+curl -s -X GET \
+  http://127.0.0.1:8005/api/rooms/0beaf05f-3f45-466f-8913-9f218b0d7884/members \
+  --cookie "access_token=YOUR_ACCESS_TOKEN" | jq
 
 # Admin removes another member from the room
 # 🔐 Authorization check should be added in controller before this call
