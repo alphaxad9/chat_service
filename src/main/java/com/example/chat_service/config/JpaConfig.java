@@ -1,5 +1,4 @@
 // chat_service/src/main/java/com/example/chat_service/config/JpaConfig.java
-
 package com.example.chat_service.config;
 
 import org.springframework.context.annotation.Configuration;
@@ -17,11 +16,15 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
  *
  * <ul>
  *   <li>Scan: {@code infrastructure.persistence.posts.jpa} (where {@code PostCommandJpaRepository} lives)</li>
+ *   <li>Scan: {@code infrastructure.persistence.members.jpa} (where {@code MemberCommandJpaRepository} lives)</li>
  * </ul>
  */
 @Configuration
 @EnableJpaRepositories(
-    basePackages = "com.example.chat_service.infrastructure.persistence.posts.jpa",
+    basePackages = {
+        "com.example.chat_service.infrastructure.persistence.posts.jpa",
+        "com.example.chat_service.infrastructure.persistence.members.jpa"
+    },
     entityManagerFactoryRef = "entityManagerFactory",
     transactionManagerRef = "transactionManager"
 )
