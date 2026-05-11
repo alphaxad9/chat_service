@@ -1,3 +1,5 @@
+// src/main/java/com/example/chat_service/application/post/handlers/dtos/PostResponseDTO.java
+
 package com.example.chat_service.application.post.handlers.dtos;
 
 import com.example.chat_service.domain.post.Post;
@@ -12,16 +14,29 @@ import java.util.UUID;
 /**
  * Data Transfer Object representing a Post for API/UI consumption.
  * 
- * Combines:
- * - PostAggregate (domain logic + state)
- * - UserView (enriched author data from external Auth Service)
+ * <p>Combines:
+ * <ul>
+ *   <li>PostAggregate (domain logic + state)</li>
+ *   <li>UserView (enriched author data from external Auth Service)</li>
+ * </ul>
+ * </p>
  * 
- * This decouples the internal domain model from external representation
- * and allows attaching resolved user data without leaking domain internals.
+ * <p>This decouples the internal domain model from external representation
+ * and allows attaching resolved user data without leaking domain internals.</p>
  * 
- * Usage:
+ * <p><strong>imageUrl field note:</strong> Initially contains RELATIVE path
+ * from domain/DB (e.g. {@code /uploads/posts/abc.jpg}). The controller
+ * converts this to an absolute URL using {@link #withImageUrl(String)}
+ * before sending the HTTP response.</p>
+ * 
+ * <p>Usage:
+ * <pre>{@code
  *   PostResponseDTO dto = PostResponseDTO.fromAggregate(postAggregate, authorUserView);
+ *   // Convert relative → absolute URL for frontend
+ *   dto = dto.withImageUrl("http://127.0.0.1:8005/uploads/posts/abc.jpg");
  *   return ResponseEntity.ok(dto); // Jackson auto-serializes to JSON
+ * }</pre>
+ * </p>
  */
 public record PostResponseDTO(
 
@@ -100,6 +115,43 @@ public record PostResponseDTO(
     }
 
     /**
+     * Create a new DTO instance with an updated imageUrl.
+     * 
+     * <p>Used to convert relative paths (from domain/DB) to absolute URLs
+     * (for frontend consumption) without modifying the original immutable record.</p>
+     * 
+     * <p><strong>Example:</strong>
+     * <pre>{@code
+     * // DTO from domain has: imageUrl = "/uploads/posts/abc.jpg"
+     * PostResponseDTO dto = PostResponseDTO.fromAggregate(aggregate, author);
+     * 
+     * // Convert to absolute URL for API response
+     * dto = dto.withImageUrl("http://127.0.0.1:8005/uploads/posts/abc.jpg");
+     * 
+     * // Response JSON now contains:
+     * // "image_url": "http://127.0.0.1:8005/uploads/posts/abc.jpg"
+     * }</pre>
+     * </p>
+     * 
+     * @param newImageUrl the absolute URL to use, or null to remove/clear image
+     * @return new PostResponseDTO instance with updated imageUrl and recalculated hasImage
+     */
+    public PostResponseDTO withImageUrl(String newImageUrl) {
+        return new PostResponseDTO(
+                this.postId,
+                this.author,
+                this.content,
+                newImageUrl,
+                this.createdAt,
+                this.updatedAt,
+                this.isDeleted,
+                // Recalculate hasImage based on new value
+                newImageUrl != null && !newImageUrl.isBlank(),
+                this.isActive
+        );
+    }
+
+    /**
      * Convert to Map for logging, testing, or manual serialization.
      * Not required for Spring MVC responses (Jackson handles records automatically),
      * but useful for debugging or non-JSON use cases.
@@ -107,7 +159,7 @@ public record PostResponseDTO(
     public java.util.Map<String, Object> toMap() {
         return java.util.Map.of(
                 "post_id", postId.toString(),
-                "author", userViewToMap(author),  // ✅ FIXED: use helper method
+                "author", userViewToMap(author),
                 "content", content,
                 "image_url", imageUrl,
                 "created_at", createdAt.toString(),

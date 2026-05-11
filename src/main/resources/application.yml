@@ -1,10 +1,22 @@
 # src/main/resources/application.yml
+
 server:
   port: 8005
 
 spring:
   application:
     name: chat_service
+  
+  # ─────────────────────────────────────────────
+  # Multipart file upload configuration
+  # ─────────────────────────────────────────────
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 10MB      # Max size per individual file upload
+      max-request-size: 15MB   # Max size for entire multipart request (files + form fields)
+      file-size-threshold: 2KB # Files larger than this are written to disk immediately
+  
   datasource:
     url: jdbc:postgresql://localhost:5432/chatdb1
     username: ishimwe
@@ -14,6 +26,7 @@ spring:
       maximum-pool-size: 10
       minimum-idle: 5
       connection-timeout: 30000
+  
   jpa:
     hibernate:
       ddl-auto: update
