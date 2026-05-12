@@ -187,12 +187,18 @@ public final class Room {
                        LocalDateTime.now(), this.createdAt, LocalDateTime.now(), this.isDeleted);
     }
 
+    // ── Group Metadata & Image Transformers (GROUP rooms only) ─────────
+
     /**
      * Update group name (only valid for GROUP rooms).
+     * @param newGroupName the new name (required, 1-100 chars, non-blank)
+     * @return new Room instance with updated name and timestamp
+     * @throws IllegalStateException if called on a DIRECT room
+     * @throws IllegalArgumentException if name is invalid
      */
     public Room withGroupName(String newGroupName) {
         if (type != Type.GROUP) {
-            throw new IllegalStateException("groupName can only be set for GROUP rooms");
+            throw new IllegalStateException("groupName can only be updated for GROUP rooms");
         }
         if (newGroupName == null || newGroupName.isBlank()) {
             throw new IllegalArgumentException("groupName cannot be empty");
@@ -201,7 +207,7 @@ public final class Room {
             throw new IllegalArgumentException("groupName cannot exceed 100 characters");
         }
         if (Objects.equals(this.groupName, newGroupName)) {
-            return this;
+            return this; // No change needed
         }
         return new Room(this.id, this.creatorId, this.type,
                        newGroupName, this.description,
@@ -210,14 +216,21 @@ public final class Room {
     }
 
     /**
-     * Update room description (optional, max 500 chars).
+     * Update room description (only valid for GROUP rooms).
+     * @param newDescription the new description (optional, max 500 chars) or null to clear
+     * @return new Room instance with updated description and timestamp
+     * @throws IllegalStateException if called on a DIRECT room
+     * @throws IllegalArgumentException if description exceeds 500 chars
      */
     public Room withDescription(String newDescription) {
+        if (type != Type.GROUP) {
+            throw new IllegalStateException("description can only be updated for GROUP rooms");
+        }
         if (newDescription != null && newDescription.length() > 500) {
             throw new IllegalArgumentException("description cannot exceed 500 characters");
         }
         if (Objects.equals(this.description, newDescription)) {
-            return this;
+            return this; // No change needed
         }
         return new Room(this.id, this.creatorId, this.type,
                        this.groupName, newDescription,
@@ -226,34 +239,50 @@ public final class Room {
     }
 
     /**
-     * Update or set cover image URL (nullable to remove).
-     */
-    public Room withCoverImage(String newCoverImageUrl) {
-        if (newCoverImageUrl != null && newCoverImageUrl.isBlank()) {
-            throw new IllegalArgumentException("coverImageUrl cannot be blank if provided");
-        }
-        if (Objects.equals(this.coverImageUrl, newCoverImageUrl)) {
-            return this;
-        }
-        return new Room(this.id, this.creatorId, this.type,
-                       this.groupName, this.description,
-                       newCoverImageUrl, this.profileImageUrl,
-                       this.lastActivityAt, this.createdAt, LocalDateTime.now(), this.isDeleted);
-    }
-
-    /**
-     * Update or set profile image URL (nullable to remove).
+     * Update or set profile image URL (only valid for GROUP rooms).
+     * Pass null to remove the profile image.
+     * @param newProfileImageUrl the new image URL/path or null to clear
+     * @return new Room instance with updated profile image and timestamp
+     * @throws IllegalStateException if called on a DIRECT room
+     * @throws IllegalArgumentException if URL is blank (but not null)
      */
     public Room withProfileImage(String newProfileImageUrl) {
+        if (type != Type.GROUP) {
+            throw new IllegalStateException("profileImageUrl can only be updated for GROUP rooms");
+        }
         if (newProfileImageUrl != null && newProfileImageUrl.isBlank()) {
             throw new IllegalArgumentException("profileImageUrl cannot be blank if provided");
         }
         if (Objects.equals(this.profileImageUrl, newProfileImageUrl)) {
-            return this;
+            return this; // No change needed
         }
         return new Room(this.id, this.creatorId, this.type,
                        this.groupName, this.description,
                        this.coverImageUrl, newProfileImageUrl,
+                       this.lastActivityAt, this.createdAt, LocalDateTime.now(), this.isDeleted);
+    }
+
+    /**
+     * Update or set cover image URL / background image (only valid for GROUP rooms).
+     * Pass null to remove the cover image.
+     * @param newCoverImageUrl the new image URL/path or null to clear
+     * @return new Room instance with updated cover image and timestamp
+     * @throws IllegalStateException if called on a DIRECT room
+     * @throws IllegalArgumentException if URL is blank (but not null)
+     */
+    public Room withCoverImage(String newCoverImageUrl) {
+        if (type != Type.GROUP) {
+            throw new IllegalStateException("coverImageUrl can only be updated for GROUP rooms");
+        }
+        if (newCoverImageUrl != null && newCoverImageUrl.isBlank()) {
+            throw new IllegalArgumentException("coverImageUrl cannot be blank if provided");
+        }
+        if (Objects.equals(this.coverImageUrl, newCoverImageUrl)) {
+            return this; // No change needed
+        }
+        return new Room(this.id, this.creatorId, this.type,
+                       this.groupName, this.description,
+                       newCoverImageUrl, this.profileImageUrl,
                        this.lastActivityAt, this.createdAt, LocalDateTime.now(), this.isDeleted);
     }
 

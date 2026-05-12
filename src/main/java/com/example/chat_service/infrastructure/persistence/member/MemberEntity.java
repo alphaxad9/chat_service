@@ -1,5 +1,5 @@
 // chat_service/src/main/java/com/example/chat_service/infrastructure/persistence/members/MemberEntity.java
-package com.example.chat_service.infrastructure.persistence.members;
+package com.example.chat_service.infrastructure.persistence.member;
 
 import jakarta.persistence.*;
 import org.hibernate.annotations.CreationTimestamp;

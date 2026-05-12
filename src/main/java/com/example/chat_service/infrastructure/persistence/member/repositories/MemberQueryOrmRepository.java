@@ -1,6 +1,6 @@
 
 // chat_service/src/main/java/com/example/chat_service/infrastructure/persistence/members/repositories/MemberQueryOrmRepository.java
-package com.example.chat_service.infrastructure.persistence.members.repositories;
+package com.example.chat_service.infrastructure.persistence.member.repositories;
 
 import java.util.Collection;
 import java.util.List;
@@ -13,9 +13,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.example.chat_service.domain.members.Member;
 import com.example.chat_service.domain.members.repositories.MemberQueryRepository;
-import com.example.chat_service.infrastructure.persistence.members.MemberEntity;
-import com.example.chat_service.infrastructure.persistence.members.MemberMapper;
-import com.example.chat_service.infrastructure.persistence.members.jpa.MemberQueryJpaRepository;
+import com.example.chat_service.infrastructure.persistence.member.MemberEntity;
+import com.example.chat_service.infrastructure.persistence.member.MemberMapper;
+import com.example.chat_service.infrastructure.persistence.member.jpa.MemberQueryJpaRepository;
 
 /**
  * JPA/Hibernate implementation of {@link MemberQueryRepository}.

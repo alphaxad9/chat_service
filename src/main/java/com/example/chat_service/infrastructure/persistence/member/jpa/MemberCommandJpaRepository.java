@@ -1,5 +1,6 @@
 // chat_service/src/main/java/com/example/chat_service/infrastructure/persistence/members/jpa/MemberCommandJpaRepository.java
-package com.example.chat_service.infrastructure.persistence.members.jpa;
+
+package com.example.chat_service.infrastructure.persistence.member.jpa;
 
 import java.util.Collection;
 import java.util.List;
@@ -9,7 +10,7 @@ import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
-import com.example.chat_service.infrastructure.persistence.members.MemberEntity;
+import com.example.chat_service.infrastructure.persistence.member.MemberEntity;
 
 /**
  * Spring Data JPA repository for command-side (write) operations on {@link MemberEntity}.

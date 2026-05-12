@@ -1,5 +1,5 @@
 // chat_service/src/main/java/com/example/chat_service/infrastructure/persistence/members/MemberMapper.java
-package com.example.chat_service.infrastructure.persistence.members;
+package com.example.chat_service.infrastructure.persistence.member;
 
 import com.example.chat_service.domain.members.Member;
 import com.example.chat_service.domain.members.MemberAggregate;

@@ -1,5 +1,5 @@
-// chat_service/src/main/java/com/example/chat_service/infrastructure/persistence/members/repositories/MemberCommandOrmRepository.java
-package com.example.chat_service.infrastructure.persistence.members.repositories;
+// chat_service/src/main/java/com/example/chat_service/infrastructure/persistence/member/repositories/MemberCommandOrmRepository.java
+package com.example.chat_service.infrastructure.persistence.member.repositories;
 
 import java.util.Collection;
 import java.util.List;
@@ -16,9 +16,9 @@ import com.example.chat_service.domain.members.MemberAggregate;
 import com.example.chat_service.domain.members.exceptions.InvalidMemberEntityError;
 import com.example.chat_service.domain.members.exceptions.MemberNotFoundError;
 import com.example.chat_service.domain.members.repositories.MemberCommandRepository;
-import com.example.chat_service.infrastructure.persistence.members.MemberEntity;
-import com.example.chat_service.infrastructure.persistence.members.MemberMapper;
-import com.example.chat_service.infrastructure.persistence.members.jpa.MemberCommandJpaRepository;
+import com.example.chat_service.infrastructure.persistence.member.MemberEntity;
+import com.example.chat_service.infrastructure.persistence.member.MemberMapper;
+import com.example.chat_service.infrastructure.persistence.member.jpa.MemberCommandJpaRepository;
 
 /**
  * JPA/Hibernate implementation of {@link MemberCommandRepository}.
