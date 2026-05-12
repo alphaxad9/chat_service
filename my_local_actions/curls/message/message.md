@@ -45,7 +45,7 @@ curl -X POST http://127.0.0.1:8000/zedvye_one/users/token/ \
 # Response includes: message data, sender info, is_mine flag, status
 curl -X POST http://127.0.0.1:8005/api/messages \
   -H "Content-Type: application/json" \
-  --cookie "access_token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzc4NjEyMDg0LCJpYXQiOjE3Nzg2MTE3ODQsImp0aSI6IjdkZWFlYjQzOWJiNDRlMDRhOWE4Y2I5ZTI1YjliY2VhIiwidXNlcl9pZCI6IjcxODg1YmJlLTFmNDgtNDJiNi05MGU3LWY5ODhhZjUyMzFkZCJ9.UEc5y47Xf6dgSMKfPv3_LQhMotnuRZ6GAG-nQ3FfxTPimstlNkWZAcDDlHsxt6_DRu9GfvtjdHmg2cBMyuyRab5BmXG58pNeU503zkLP6JysE9Iyjwgy71Q2bjCyPPCUayG9OhfaGDs5iVijSkesgNn4d__Hvze1rO7xTw28VdbPFQpvEd7yvxcni_P2DfzcsO-bFEwvJGq-dT6VWId41IhWBXMvyl1sIrs9y0bsvM6iZ0AiW3dflO4D6OwlbubPjQ8JIAi8IrvvHkjf1euKlPxfKD_m0HDhsB5NC_UvIq-JapH_UWp4_jI85O1B-F5GLRIFa1urQzUCsPm0UnyhHA" \
+  --cookie "access_token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzc4NjEzMjY0LCJpYXQiOjE3Nzg2MTI5NjQsImp0aSI6IjlmMTljM2Y4NDcwMDQ4MTBiYmViZjE5MmRiY2ZiYTc4IiwidXNlcl9pZCI6IjcxODg1YmJlLTFmNDgtNDJiNi05MGU3LWY5ODhhZjUyMzFkZCJ9.MmIWkxwnYiJ3o-k1oGCyWJMqzGWA-PPr5Yj-iu6IscvNaLYsNeMRvKQ8_oOZt9Gq8zHDyeUYqrrjmmhkd6md_EYiEw-hU0tXP2WxT1472n8_RuO_a_Jen2cGge4U0GCjhbNumfmrmuWvnmmYoYFIkvJw_W0nrgsdq-IdmR7_FW4A1Js5HmtQJHnMxmAh8z5beQppU7XZiBtgna5c4x597SHRbPZ3ZTZSSrCwch6Lwa-ygJmvEsDT-KRJUr_mLfbCBimLt_nEFBOzg0zDYRbGCGYPsvn0JTI_FCnjyUs2fNjDIxQASB2L9kgtV2EyEImsd1tYkoAOTn-0FtVBiM726g" \
   -d '{
     "room_id": "ca9ee906-a23a-4e07-9cb5-08684cf3b21a",
     "content": "Hello team! Starting the sprint planning session."
@@ -68,8 +68,7 @@ curl -X POST http://127.0.0.1:8005/api/messages \
 # 🔐 Authenticated user becomes sender; image saved to /uploads/messages/
 # Response includes absolute image_url after MediaUrlService conversion
 curl -X POST http://127.0.0.1:8005/api/messages/with-image \
-  --cookie "access_token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzc4NjA4NjU5LCJpYXQiOjE3Nzg2MDgzNTksImp0aSI6IjQzYmVmOWFlMGRkZjQ5YjZhZGJlMmJjMmY1N2UzNTI0IiwidXNlcl9pZCI6IjcxODg1YmJlLTFmNDgtNDJiNi05MGU3LWY5ODhhZjUyMzFkZCJ9.AWfTeh2YIDsIOjWf4DANSZ1d8ITbPwEAvbTSdsxouudyXpVThTud_S-p0-E1XzxJ8vSUfL0q22U84xvwEcUOXa0MwEJGbRIpP16j4Q5ETULt8VEmPOkGf9RreKdRysgR07Yl2bXlAsYe6q2k5q6l04mOwNpp9RkoLB9FSavrLDrSQPv0-JJhcvMQpVrBq5yEn2YGfodDsSSb5cxx2COJpRw_XWdAhwXQpsecE3PV0bGr14-ggb85x5n6DZOO7YO9Hy4megcvAR-OT8wQKln8eTacs2hbPLGxjgdANAqaXMWus8A14ccgpvvJxxhk_ew5yU-BHTt-XxYfpkSDmykF9A" \
-  -F "room_id=ca9ee906-a23a-4e07-9cb5-08684cf3b21a" \
+  --cookie "access_token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzc4NjEzMjY0LCJpYXQiOjE3Nzg2MTI5NjQsImp0aSI6IjlmMTljM2Y4NDcwMDQ4MTBiYmViZjE5MmRiY2ZiYTc4IiwidXNlcl9pZCI6IjcxODg1YmJlLTFmNDgtNDJiNi05MGU3LWY5ODhhZjUyMzFkZCJ9.MmIWkxwnYiJ3o-k1oGCyWJMqzGWA-PPr5Yj-iu6IscvNaLYsNeMRvKQ8_oOZt9Gq8zHDyeUYqrrjmmhkd6md_EYiEw-hU0tXP2WxT1472n8_RuO_a_Jen2cGge4U0GCjhbNumfmrmuWvnmmYoYFIkvJw_W0nrgsdq-IdmR7_FW4A1Js5HmtQJHnMxmAh8z5beQppU7XZiBtgna5c4x597SHRbPZ3ZTZSSrCwch6Lwa-ygJmvEsDT-KRJUr_mLfbCBimLt_nEFBOzg0zDYRbGCGYPsvn0JTI_FCnjyUs2fNjDIxQASB2L9kgtV2EyEImsd1tYkoAOTn-0FtVBiM726g" \
   -F "content=Check out this design mockup for the new feature!" \
   -F "image=@/home/ishimwe/projs/django/microservices/service_one/zedvye_six/chat_service/my_local_actions/pexels-marros-33143616.jpg" | jq
 
@@ -77,7 +76,7 @@ curl -X POST http://127.0.0.1:8005/api/messages/with-image \
 # Send a message with ONLY an image (empty content)
 # Fixed: Send message with ONLY an image
 curl -X POST http://127.0.0.1:8005/api/messages/with-image \
-  --cookie "access_token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzc4NjEyNDIwLCJpYXQiOjE3Nzg2MTIxMjAsImp0aSI6ImViODdmNWI4MmVhMTQzZjk5OGIyZjkwYzA1OGU0Njg3IiwidXNlcl9pZCI6IjcxODg1YmJlLTFmNDgtNDJiNi05MGU3LWY5ODhhZjUyMzFkZCJ9.J_jC2dK1PXfOVs1j8WRZMHykR4iuXa1hEzxRg9TVeB-N7iavVPhz0YdrbmP7mDiBGwQhhXAm7HYZ9zFIis_SvKbM5PraB9_E4PFzk5wTNffNyTPJzRd4TA_1W7hWE1fCamUMGdP2opwdlMCTi01Xi1ZtiDHVCBd_jS0R6ih_4nNEGUqw8kd7dNGgivjyI2Ant5DQXbIWSAFfGTjej25tGKBSMWdck3BSO6QtnV7rir82jRB1Wgulvjq_IRP-qq7MUMsvfTLcffGUBGq9zIvExB8wN5e42H3w0ehQ6An8qzDeFFMFleTEEctreJVtFKcGIWeWUtbp31qVKuPqckBf_Q" \
+  --cookie "access_token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzc4NjEzMjY0LCJpYXQiOjE3Nzg2MTI5NjQsImp0aSI6IjlmMTljM2Y4NDcwMDQ4MTBiYmViZjE5MmRiY2ZiYTc4IiwidXNlcl9pZCI6IjcxODg1YmJlLTFmNDgtNDJiNi05MGU3LWY5ODhhZjUyMzFkZCJ9.MmIWkxwnYiJ3o-k1oGCyWJMqzGWA-PPr5Yj-iu6IscvNaLYsNeMRvKQ8_oOZt9Gq8zHDyeUYqrrjmmhkd6md_EYiEw-hU0tXP2WxT1472n8_RuO_a_Jen2cGge4U0GCjhbNumfmrmuWvnmmYoYFIkvJw_W0nrgsdq-IdmR7_FW4A1Js5HmtQJHnMxmAh8z5beQppU7XZiBtgna5c4x597SHRbPZ3ZTZSSrCwch6Lwa-ygJmvEsDT-KRJUr_mLfbCBimLt_nEFBOzg0zDYRbGCGYPsvn0JTI_FCnjyUs2fNjDIxQASB2L9kgtV2EyEImsd1tYkoAOTn-0FtVBiM726g" \
   -F "room_id=ca9ee906-a23a-4e07-9cb5-08684cf3b21a" \
   -F "content=" \
   -F "image=@/home/ishimwe/projs/django/microservices/service_one/zedvye_six/chat_service/my_local_actions/pexels-myburgh-4816921.jpg;type=image/jpeg" | jq
@@ -122,39 +121,6 @@ curl -X POST http://127.0.0.1:8005/api/messages/reply/with-image \
   -F "content=Here is my revised version based on your feedback" \
   -F "parent_id=550e8400-e29b-41d4-a716-446655440000" \
   -F "image=@$HOME/projs/django/microservices/service_one/zedvye_six/chat_service/my_local_actions/pexels-marros-33143616.jpg;type=image/jpeg" | jq
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 # =============================================================================
@@ -286,3 +252,103 @@ curl -X PATCH "http://127.0.0.1:8005/api/messages/eebc67b7-6866-482a-a523-0a232f
 # }
 
 # 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# =============================================================================
+# MESSAGE QUERY API - CURL TEST COMMANDS
+# =============================================================================
+# Base URL: http://127.0.0.1:8005
+# Auth: JWT token via --cookie "access_token=..."
+# All responses piped through jq for pretty JSON formatting
+# 
+# 🔑 Replace {room_id} with an actual room UUID from a previous room creation
+# 🔑 Replace access_token values with fresh tokens from /zedvye_one/users/token/ endpoint
+# 🔑 The requester_id is automatically extracted from UserContext (JWT token)
+# 
+# Sample user IDs for testing:
+#   "9e6c4138-3129-4875-8e72-25e4cb05905d"  # test9@example.com
+#   "71885bbe-1f48-42b6-90e7-f988af5231dd"  # test@example.com
+#   "0beaf05f-3f45-466f-8913-9f218b0d7884"  # another test user
+# 
+# Expected response fields:
+#   - is_mine: true when requester_id == message.sender_id
+#   - sender_username: "You" when is_mine=true, else actual username
+#   - parent_preview: present when message.is_reply=true (image-over-text priority)
+#   - All image URLs are ABSOLUTE (converted from relative paths by MediaUrlService)
+# =============================================================================
+
+# ───────────────────────────────────────────────────────────────────────────
+# 1. QUERY ALL ACTIVE MESSAGES BY ROOM (Basic Chat History)
+# ───────────────────────────────────────────────────────────────────────────
+
+# Fetch all active messages for a room as user test@example.com (sender role)
+# 🔐 requester_id extracted from JWT → is_mine=true for messages sent by this user
+# 🔐 sender_username will be "You" for own messages
+# 🔐 Messages ordered by created_at ascending (oldest first) for chat history
+curl -X GET http://127.0.0.1:8005/api/messages/room/ca9ee906-a23a-4e07-9cb5-08684cf3b21a \
+  --cookie "access_token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzc4NjEyMDg0LCJpYXQiOjE3Nzg2MTE3ODQsImp0aSI6IjdkZWFlYjQzOWJiNDRlMDRhOWE4Y2I5ZTI1YjliY2VhIiwidXNlcl9pZCI6IjcxODg1YmJlLTFmNDgtNDJiNi05MGU3LWY5ODhhZjUyMzFkZCJ9.UEc5y47Xf6dgSMKfPv3_LQhMotnuRZ6GAG-nQ3FfxTPimstlNkWZAcDDlHsxt6_DRu9GfvtjdHmg2cBMyuyRab5BmXG58pNeU503zkLP6JysE9Iyjwgy71Q2bjCyPPCUayG9OhfaGDs5iVijSkesgNn4d__Hvze1rO7xTw28VdbPFQpvEd7yvxcni_P2DfzcsO-bFEwvJGq-dT6VWId41IhWBXMvyl1sIrs9y0bsvM6iZ0AiW3dflO4D6OwlbubPjQ8JIAi8IrvvHkjf1euKlPxfKD_m0HDhsB5NC_UvIq-JapH_UWp4_jI85O1B-F5GLRIFa1urQzUCsPm0UnyhHA" \
+  | jq
+
+# Expected response structure (array of messages):
+# [
+#   {
+#     "id": "550e8400-e29b-41d4-a716-446655440000",
+#     "room_id": "ca9ee906-a23a-4e07-9cb5-08684cf3b21a",
+#     "content": "Hello team! Starting the sprint planning session.",
+#     "image_url": "",
+#     "is_reply": false,
+#     "parent_preview": null,
+#     "created_at": "2024-01-15T10:30:00Z",
+#     "is_mine": true,                    // ← true because requester is sender
+#     "status": "SEEN",
+#     "sender_username": "You",           // ← personalized as "You"
+#     "sender_profile_image": "http://127.0.0.1:8005/uploads/users/profile/xyz.jpg",
+#     "has_image": false,
+#     "is_deleted": false,
+#     "updated_at": "2024-01-15T10:30:00Z",
+#     "seen_at": "2024-01-15T10:31:00Z"
+#   },
+#   {
+#     "id": "660e8400-e29b-41d4-a716-446655440001",
+#     "room_id": "ca9ee906-a23a-4e07-9cb5-08684cf3b21a",
+#     "content": "Thanks for the update!",
+#     "image_url": "http://127.0.0.1:8005/uploads/messages/abc123.jpg",  // ← absolute URL
+#     "is_reply": false,
+#     "parent_preview": null,
+#     "created_at": "2024-01-15T10:32:00Z",
+#     "is_mine": false,                   // ← false because different sender
+#     "status": "RECEIVED",
+#     "sender_username": "test9",         // ← actual username (not "You")
+#     "sender_profile_image": "http://127.0.0.1:8005/uploads/users/profile/def456.jpg",
+#     "has_image": true,
+#     "is_deleted": false,
+#     ...
+#   }
+# ]
+
+# ───────────────────────────────────────────────────────────────────────────
+# 2. QUERY MESSAGES AS DIFFERENT USER (Test is_mine & Personalization)
+# ───────────────────────────────────────────────────────────────────────────
+
+# Fetch same room as user test9@example.com (receiver role)
+# 🔐 requester_id changed → is_mine flag flips for messages sent
