@@ -1,7 +1,6 @@
 // chat_service/src/main/java/com/example/chat_service/application/members/handlers/MemberCommandHandler.java
 package com.example.chat_service.application.members.handlers;
 
-import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -14,7 +13,7 @@ import com.example.chat_service.application.members.services.MemberCommandServic
 import com.example.chat_service.domain.members.Member;
 import com.example.chat_service.domain.members.MemberAggregate;
 import com.example.chat_service.external.users.dtos.UserView;
-import com.example.chat_service.external.users.services.UserApiClient;
+import com.example.chat_service.external.users.dtos.users.services.UserApiClient;
 
 /**
  * Application-layer orchestrator for member commands.

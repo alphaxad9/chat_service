@@ -1,6 +1,6 @@
 // src/main/java/com/example/chat_service/api/chat/dtos/CreatePostRequest.java
 
-package com.example.chat_service.api.chat.dtos;
+package com.example.chat_service.application.members.handlers.dtos;
 
 /**
  * Request DTO for creating a new post via multipart/form-data HTTP API.

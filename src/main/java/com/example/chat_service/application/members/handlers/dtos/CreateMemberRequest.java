@@ -1,5 +1,5 @@
 // chat_service/src/main/java/com/example/chat_service/api/chat/dtos/CreateMemberRequest.java
-package com.example.chat_service.api.chat.dtos;
+package com.example.chat_service.application.members.handlers.dtos;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.UUID;

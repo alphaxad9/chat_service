@@ -9,7 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-// import com.example.chat_service.api.chat.dtos.CreatePostRequest;
+// import com.example.chat_service.application.members.handlers.dtos.CreatePostRequest;
 import com.example.chat_service.application.post.handlers.PostCommandHandler;
 import com.example.chat_service.application.post.handlers.dtos.PostResponseDTO;
 import com.example.chat_service.infrastructure.security.UserContext;

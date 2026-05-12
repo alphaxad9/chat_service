@@ -13,7 +13,7 @@ import com.example.chat_service.application.members.handlers.dtos.MemberQueryRes
 import com.example.chat_service.application.members.services.MemberQueryServiceInterface;
 import com.example.chat_service.domain.members.Member;
 import com.example.chat_service.external.users.dtos.UserView;
-import com.example.chat_service.external.users.services.UserApiClient;
+import com.example.chat_service.external.users.dtos.users.services.UserApiClient;
 
 /**
  * Application-layer orchestrator for member queries.

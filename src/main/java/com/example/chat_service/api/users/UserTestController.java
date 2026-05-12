@@ -1,7 +1,7 @@
 package com.example.chat_service.api.users;
 
 import com.example.chat_service.external.users.dtos.UserView;
-import com.example.chat_service.external.users.services.UserApiClient;
+import com.example.chat_service.external.users.dtos.users.services.UserApiClient;
 
 import org.springframework.web.bind.annotation.*;
 

@@ -1,4 +1,4 @@
-package com.example.chat_service.external.users.services;
+package com.example.chat_service.external.users.dtos.users.services;
 
 import com.example.chat_service.config.AuthProperties;
 import com.example.chat_service.external.users.dtos.UserResponse;

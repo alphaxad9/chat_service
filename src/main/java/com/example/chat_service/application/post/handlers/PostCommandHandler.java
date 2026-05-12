@@ -13,7 +13,7 @@ import com.example.chat_service.application.post.handlers.dtos.PostResponseDTO;
 import com.example.chat_service.application.post.services.PostCommandServiceInterface;
 import com.example.chat_service.domain.post.PostAggregate;
 import com.example.chat_service.external.users.dtos.UserView;
-import com.example.chat_service.external.users.services.UserApiClient;
+import com.example.chat_service.external.users.dtos.users.services.UserApiClient;
 import com.example.chat_service.infrastructure.media.LocalMediaStorageService;
 import com.example.chat_service.infrastructure.media.MediaUrlService;
 

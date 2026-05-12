@@ -10,7 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import com.example.chat_service.api.chat.dtos.CreateMemberRequest;
+import com.example.chat_service.application.members.handlers.dtos.CreateMemberRequest;
 import com.example.chat_service.application.members.handlers.MemberCommandHandler;
 import com.example.chat_service.application.members.handlers.dtos.MemberResponseDTO;
 import com.example.chat_service.domain.members.Member;
