@@ -1,5 +1,3 @@
-// chat_service/src/main/java/com/example/chat_service/api/chat/RoomCommandController.java
-
 package com.example.chat_service.api.chat;
 
 import java.util.List;
@@ -13,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.example.chat_service.application.rooms.handlers.RoomCommandHandler;
+import com.example.chat_service.application.rooms.handlers.dtos.GroupUpdateActionsResponse;
 import com.example.chat_service.application.rooms.handlers.dtos.GroupCreationResponse;
 import com.example.chat_service.application.rooms.handlers.dtos.PrivateRoomCreationResponse;
 import com.example.chat_service.infrastructure.media.MediaUrlService;
@@ -81,56 +80,9 @@ public class RoomCommandController {
     }
 
     // ─────────────────────────────────────────────────────────────────
-    // GROUP ROOM CREATION
+    // GROUP ROOM CREATION (unchanged - working correctly)
     // ─────────────────────────────────────────────────────────────────
 
-    /**
-     * Create a new GROUP room with participants and optional images.
-     *
-     * <p><strong>Request Format (multipart/form-data):</strong></p>
-     * <pre>{@code
-     * POST /api/rooms/groups
-     * Content-Type: multipart/form-data; boundary=----WebKitFormBoundary
-     * Authorization: Bearer <jwt_token>
-     *
-     * ------WebKitFormBoundary
-     * Content-Disposition: form-data; name="group_name"
-     *
-     * Project Team
-     * ------WebKitFormBoundary
-     * Content-Disposition: form-data; name="description"
-     *
-     * Team collaboration space
-     * ------WebKitFormBoundary
-     * Content-Disposition: form-data; name="participant_ids"
-     *
-     * ["uuid-1","uuid-2","uuid-3"]
-     * ------WebKitFormBoundary
-     * Content-Disposition: form-data; name="profile_image"; filename="avatar.jpg"
-     * Content-Type: image/jpeg
-     *
-     * [binary image data]
-     * ------WebKitFormBoundary
-     * Content-Disposition: form-data; name="cover_image"; filename="cover.jpg"
-     * Content-Type: image/jpeg
-     *
-     * [binary image data]
-     * ------WebKitFormBoundary--
-     * }</pre>
-     *
-     * <p><strong>Security:</strong> The authenticated user ID is extracted from the JWT token
-     * via {@code UserContext}. This user becomes the room creator and ADMIN. Client cannot
-     * impersonate another user as creator.</p>
-     *
-     * @param groupName the name for the new group (1-100 chars)
-     * @param description optional description (max 500 chars)
-     * @param participantIdsJson JSON array string of participant user IDs (must have >= 2 IDs)
-     * @param profileImage optional profile/avatar image file
-     * @param coverImage optional cover/background image file
-     * @param request the incoming HTTP request (used to build absolute media URLs)
-     * @return ResponseEntity with GroupCreationResponse and HTTP 201
-     * @throws RuntimeException if user is not authenticated or participant count is invalid
-     */
     @PostMapping(
             path = "/groups",
             consumes = {"multipart/form-data"}
@@ -155,11 +107,6 @@ public class RoomCommandController {
             HttpServletRequest request
 
     ) {
-        // ─────────────────────────────────────────────
-        // Extract authenticated user from JWT filter
-        // UserContext is thread-local, populated by JWTAuthenticationFilter
-        // This is the ONLY source of truth for "who is creating this room"
-        // ─────────────────────────────────────────────
         UUID creatorId = UserContext
                 .getUserIdAsUuid()
                 .orElseThrow(() -> {
@@ -167,10 +114,6 @@ public class RoomCommandController {
                     return new RuntimeException("Unauthorized: No authenticated user found in context");
                 });
 
-        // ─────────────────────────────────────────────
-        // Parse participant IDs from JSON array string
-        // Expected format: ["uuid-1","uuid-2","uuid-3"]
-        // ─────────────────────────────────────────────
         List<UUID> participantIds = parseUuidList(participantIdsJson);
 
         logger.info(
@@ -178,16 +121,6 @@ public class RoomCommandController {
                 creatorId, groupName, participantIds.size()
         );
 
-        // ─────────────────────────────────────────────
-        // Delegate to application layer handler
-        // Handler orchestrates:
-        //   - Validate participant count (>= 2 excluding creator)
-        //   - Save images (if provided) → get RELATIVE URL paths
-        //   - Create RoomAggregate with relative image paths
-        //   - Persist room + create member records (transactional)
-        //   - Fetch usernames from Auth Service
-        //   - Build GroupCreationResponse with relative profile_image_url
-        // ─────────────────────────────────────────────
         GroupCreationResponse response = roomCommandHandler.createGroupRoom(
                 creatorId,
                 groupName,
@@ -197,10 +130,6 @@ public class RoomCommandController {
                 coverImage
         );
 
-        // ─────────────────────────────────────────────
-        // Convert relative profile image path → absolute URL for frontend
-        // This keeps domain/DB portable while giving frontend ready-to-use URLs
-        // ─────────────────────────────────────────────
         if (response.hasProfileImage() && response.profileImageUrl() != null) {
             String absoluteProfileUrl = mediaUrlService.buildMediaUrl(request, response.profileImageUrl());
             response = response.withProfileImageUrl(absoluteProfileUrl);
@@ -218,34 +147,9 @@ public class RoomCommandController {
     }
 
     // ─────────────────────────────────────────────────────────────────
-    // DIRECT ROOM CREATION
+    // DIRECT ROOM CREATION (unchanged - working correctly)
     // ─────────────────────────────────────────────────────────────────
 
-    /**
-     * Create or retrieve a DIRECT message room between two users.
-     *
-     * <p><strong>Request Format (application/json):</strong></p>
-     * <pre>{@code
-     * POST /api/rooms/direct
-     * Content-Type: application/json
-     * Authorization: Bearer <jwt_token>
-     *
-     * {
-     *   "friend_id": "uuid-of-other-user"
-     * }
-     * }</pre>
-     *
-     * <p><strong>Security:</strong> The authenticated user ID is extracted from the JWT token.
-     * This user becomes one participant; the {@code friend_id} in the body is the other participant.
-     * Bidirectional deduplication ensures no duplicate conversations between the same two users.</p>
-     *
-     * <p><strong>Note:</strong> DIRECT rooms have no profile/cover images. Frontend should
-     * fetch participant profile images separately via the user service.</p>
-     *
-     * @param requestDto body containing {@code friend_id}
-     * @return ResponseEntity with PrivateRoomCreationResponse and HTTP 201 (or 200 if room existed)
-     * @throws RuntimeException if user is not authenticated
-     */
     @PostMapping(
             path = "/direct",
             consumes = {"application/json"},
@@ -257,10 +161,6 @@ public class RoomCommandController {
             CreateDirectRoomRequest requestDto
 
     ) {
-        // ─────────────────────────────────────────────
-        // Extract authenticated user from JWT filter
-        // This user is the conversation initiator
-        // ─────────────────────────────────────────────
         UUID creatorId = UserContext
                 .getUserIdAsUuid()
                 .orElseThrow(() -> {
@@ -275,22 +175,11 @@ public class RoomCommandController {
                 creatorId, friendId
         );
 
-        // ─────────────────────────────────────────────
-        // Delegate to application layer handler
-        // Handler orchestrates:
-        //   - Bidirectional lookup: (creator, friend) then (friend, creator)
-        //   - If found: return existing room (prevents duplicates)
-        //   - If not found: create new DIRECT room + member records
-        //   - Fetch usernames from Auth Service
-        //   - Build PrivateRoomCreationResponse (no image fields for DIRECT)
-        // ─────────────────────────────────────────────
         PrivateRoomCreationResponse response = roomCommandHandler.createDirectRoom(
                 creatorId,
                 friendId
         );
 
-        // Determine HTTP status: 201 if new room, 200 if existing room returned
-        // (Handler doesn't expose this detail, so we default to 201 for simplicity)
         HttpStatus status = HttpStatus.CREATED;
 
         logger.info(
@@ -304,29 +193,212 @@ public class RoomCommandController {
     }
 
     // ─────────────────────────────────────────────────────────────────
-    // HELPER METHODS
+    // GROUP ROOM UPDATE ACTIONS (return GroupUpdateActionsResponse)
     // ─────────────────────────────────────────────────────────────────
 
     /**
-     * Parse a JSON array string of UUIDs into a List<UUID>.
-     *
-     * <p>Expected input format: {@code ["uuid-1","uuid-2","uuid-3"]}</p>
-     *
-     * @param jsonUuidArray the JSON array string
-     * @return list of parsed UUIDs
-     * @throws IllegalArgumentException if parsing fails or format is invalid
+     * Delete a GROUP room.
      */
+    @DeleteMapping("/groups/{room_id}")
+    public ResponseEntity<GroupUpdateActionsResponse> deleteRoom(
+            @PathVariable("room_id") UUID roomId,
+            HttpServletRequest request
+    ) {
+        UUID requesterId = UserContext
+                .getUserIdAsUuid()
+                .orElseThrow(() -> {
+                    logger.error("Unauthorized: No authenticated user found for deleteRoom");
+                    return new RuntimeException("Unauthorized: No authenticated user found in context");
+                });
+
+        logger.info("Processing delete room: room_id={}, requester_id={}", roomId, requesterId);
+
+        GroupUpdateActionsResponse response = roomCommandHandler.deleteRoom(roomId, requesterId);
+
+        response = convertImageUrlsToAbsolute(response, request);
+
+        logger.info("Room deleted successfully: room_id={}", roomId);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Update the group name for a GROUP room.
+     */
+    @PatchMapping("/groups/{room_id}/name")
+    public ResponseEntity<GroupUpdateActionsResponse> updateGroupName(
+            @PathVariable("room_id") UUID roomId,
+            @RequestBody UpdateGroupNameRequest requestDto,
+            HttpServletRequest request
+    ) {
+        UUID requesterId = UserContext
+                .getUserIdAsUuid()
+                .orElseThrow(() -> {
+                    logger.error("Unauthorized: No authenticated user found for updateGroupName");
+                    return new RuntimeException("Unauthorized: No authenticated user found in context");
+                });
+
+        logger.info("Processing update group name: room_id={}, new_name='{}'", roomId, requestDto.newName());
+
+        GroupUpdateActionsResponse response = roomCommandHandler.updateGroupName(
+                roomId,
+                requestDto.newName(),
+                requesterId
+        );
+
+        response = convertImageUrlsToAbsolute(response, request);
+
+        logger.info("Group name updated: room_id={}, new_name='{}'", roomId, requestDto.newName());
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Update the description for a GROUP room.
+     */
+    @PatchMapping("/groups/{room_id}/description")
+    public ResponseEntity<GroupUpdateActionsResponse> updateDescription(
+            @PathVariable("room_id") UUID roomId,
+            @RequestBody UpdateDescriptionRequest requestDto,
+            HttpServletRequest request
+    ) {
+        UUID requesterId = UserContext
+                .getUserIdAsUuid()
+                .orElseThrow(() -> {
+                    logger.error("Unauthorized: No authenticated user found for updateDescription");
+                    return new RuntimeException("Unauthorized: No authenticated user found in context");
+                });
+
+        logger.info("Processing update description: room_id={}", roomId);
+
+        GroupUpdateActionsResponse response = roomCommandHandler.updateDescription(
+                roomId,
+                requestDto.newDescription(),
+                requesterId
+        );
+
+        response = convertImageUrlsToAbsolute(response, request);
+
+        logger.info("Description updated: room_id={}", roomId);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Update the cover image for a GROUP room.
+     *
+     * <p><strong>Important:</strong> Image saving is handled by {@code RoomCommandHandler}
+     * via {@code LocalMediaStorageService}. This controller only passes the {@code MultipartFile}
+     * to the handler and converts the returned relative URL to absolute for the response.</p>
+     */
+    @PatchMapping(
+            path = "/groups/{room_id}/cover-image",
+            consumes = {"multipart/form-data"}
+    )
+    public ResponseEntity<GroupUpdateActionsResponse> updateCoverImage(
+            @PathVariable("room_id") UUID roomId,
+            @RequestPart(value = "cover_image", required = false) MultipartFile coverImage,
+            @RequestParam(value = "remove", required = false) Boolean remove,
+            HttpServletRequest request
+    ) {
+        UUID requesterId = UserContext
+                .getUserIdAsUuid()
+                .orElseThrow(() -> {
+                    logger.error("Unauthorized: No authenticated user found for updateCoverImage");
+                    return new RuntimeException("Unauthorized: No authenticated user found in context");
+                });
+
+        logger.info("Processing update cover image: room_id={}, remove={}", roomId, remove);
+
+        // Delegate to handler - handler handles image saving via LocalMediaStorageService
+        GroupUpdateActionsResponse response = roomCommandHandler.updateCoverImage(
+                roomId,
+                coverImage,
+                Boolean.TRUE.equals(remove),
+                requesterId
+        );
+
+        response = convertImageUrlsToAbsolute(response, request);
+
+        logger.info("Cover image updated: room_id={}", roomId);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Update the profile image for a GROUP room.
+     *
+     * <p><strong>Important:</strong> Image saving is handled by {@code RoomCommandHandler}
+     * via {@code LocalMediaStorageService}. This controller only passes the {@code MultipartFile}
+     * to the handler and converts the returned relative URL to absolute for the response.</p>
+     */
+    @PatchMapping(
+            path = "/groups/{room_id}/profile-image",
+            consumes = {"multipart/form-data"}
+    )
+    public ResponseEntity<GroupUpdateActionsResponse> updateProfileImage(
+            @PathVariable("room_id") UUID roomId,
+            @RequestPart(value = "profile_image", required = false) MultipartFile profileImage,
+            @RequestParam(value = "remove", required = false) Boolean remove,
+            HttpServletRequest request
+    ) {
+        UUID requesterId = UserContext
+                .getUserIdAsUuid()
+                .orElseThrow(() -> {
+                    logger.error("Unauthorized: No authenticated user found for updateProfileImage");
+                    return new RuntimeException("Unauthorized: No authenticated user found in context");
+                });
+
+        logger.info("Processing update profile image: room_id={}, remove={}", roomId, remove);
+
+        // Delegate to handler - handler handles image saving via LocalMediaStorageService
+        GroupUpdateActionsResponse response = roomCommandHandler.updateProfileImage(
+                roomId,
+                profileImage,
+                Boolean.TRUE.equals(remove),
+                requesterId
+        );
+
+        response = convertImageUrlsToAbsolute(response, request);
+
+        logger.info("Profile image updated: room_id={}", roomId);
+        return ResponseEntity.ok(response);
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // HELPER: Convert relative image URLs to absolute for response
+    // ─────────────────────────────────────────────────────────────────
+
+    private GroupUpdateActionsResponse convertImageUrlsToAbsolute(
+            GroupUpdateActionsResponse response,
+            HttpServletRequest request
+    ) {
+        GroupUpdateActionsResponse updated = response;
+
+        if (response.hasProfileImage() && response.profileImageUrl() != null && !response.profileImageUrl().isBlank()) {
+            String absoluteProfileUrl = mediaUrlService.buildMediaUrl(request, response.profileImageUrl());
+            updated = updated.withProfileImageUrl(absoluteProfileUrl);
+            logger.debug("Converted profile image to absolute URL: {}", absoluteProfileUrl);
+        }
+
+        if (response.hasCoverImage() && response.coverImageUrl() != null && !response.coverImageUrl().isBlank()) {
+            String absoluteCoverUrl = mediaUrlService.buildMediaUrl(request, response.coverImageUrl());
+            updated = updated.withCoverImageUrl(absoluteCoverUrl);
+            logger.debug("Converted cover image to absolute URL: {}", absoluteCoverUrl);
+        }
+
+        return updated;
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // HELPER: Parse UUID list from JSON string
+    // ─────────────────────────────────────────────────────────────────
+
     private List<UUID> parseUuidList(String jsonUuidArray) {
         if (jsonUuidArray == null || jsonUuidArray.isBlank()) {
             throw new IllegalArgumentException("participant_ids cannot be empty");
         }
 
-        // Simple parsing: remove brackets, split by comma, trim quotes
-        // For production, consider using a proper JSON library like Jackson
         String cleaned = jsonUuidArray
                 .trim()
-                .replaceAll("^\\[|\\]$", "")  // Remove [ and ]
-                .replaceAll("\"", "");          // Remove quotes
+                .replaceAll("^\\[|\\]$", "")
+                .replaceAll("\"", "");
 
         if (cleaned.isBlank()) {
             return List.of();
@@ -350,17 +422,22 @@ public class RoomCommandController {
     }
 
     // ─────────────────────────────────────────────────────────────────
-    // NESTED DTO FOR REQUEST PARSING
+    // NESTED REQUEST DTOs
     // ─────────────────────────────────────────────────────────────────
 
-    /**
-     * Request DTO for creating a DIRECT room.
-     * Contains only the friend_id parameter.
-     *
-     * <p>Using a record for immutability and clean JSON binding.</p>
-     */
     public record CreateDirectRoomRequest(
             @com.fasterxml.jackson.annotation.JsonProperty("friend_id")
             UUID friendId
     ) {}
+
+    public record UpdateGroupNameRequest(
+            @com.fasterxml.jackson.annotation.JsonProperty("new_name")
+            String newName
+    ) {}
+
+    public record UpdateDescriptionRequest(
+            @com.fasterxml.jackson.annotation.JsonProperty("new_description")
+            String newDescription
+    ) {}
+
 }

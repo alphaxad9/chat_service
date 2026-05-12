@@ -1,6 +1,3 @@
-
-// chat_service/src/main/java/com/example/chat_service/application/rooms/handlers/RoomCommandHandler.java
-
 package com.example.chat_service.application.rooms.handlers;
 
 import java.util.ArrayList;
@@ -16,6 +13,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.example.chat_service.application.rooms.handlers.dtos.GroupUpdateActionsResponse;
 import com.example.chat_service.application.rooms.handlers.dtos.GroupCreationResponse;
 import com.example.chat_service.application.rooms.handlers.dtos.PrivateRoomCreationResponse;
 import com.example.chat_service.application.rooms.services.RoomCommandServiceInterface;
@@ -416,6 +414,200 @@ public class RoomCommandHandler {
     }
 
     // ─────────────────────────────────────────────────────────────────
+    // GROUP ROOM UPDATE ACTIONS (return GroupUpdateActionsResponse)
+    // ─────────────────────────────────────────────────────────────────
+
+    /**
+     * Delete a GROUP room and return the response DTO.
+     *
+     * @param roomId the UUID of the room to delete
+     * @param requesterId the UUID of the user requesting deletion
+     * @return GroupUpdateActionsResponse with operation="delete"
+     */
+    public GroupUpdateActionsResponse deleteRoom(UUID roomId, UUID requesterId) {
+        logger.info("Deleting GROUP room: room_id={}, requester_id={}", roomId, requesterId);
+
+        RoomAggregate savedRoom = roomCommandService.deleteRoom(roomId, requesterId);
+
+        // Fetch members and usernames for response
+        List<MemberAggregate> members = memberCommandService.bulkLoadActiveByRoomId(roomId);
+        Map<UUID, String> userIdToUsername = fetchUsernamesForMembers(members);
+
+        GroupUpdateActionsResponse response = GroupUpdateActionsResponse.fromRoom(
+                savedRoom,
+                userIdToUsername,
+                requesterId
+        );
+
+        logger.info("GROUP room deleted: room_id={}, operation=delete", roomId);
+        return response;
+    }
+
+    /**
+     * Update group name and return the response DTO.
+     *
+     * @param roomId the UUID of the room to update
+     * @param newGroupName the new group name
+     * @param requesterId the UUID of the user performing the update
+     * @return GroupUpdateActionsResponse with operation="update_name"
+     */
+    public GroupUpdateActionsResponse updateGroupName(UUID roomId, String newGroupName, UUID requesterId) {
+        logger.info("Updating group name: room_id={}, new_name='{}', requester_id={}", roomId, newGroupName, requesterId);
+
+        RoomAggregate savedRoom = roomCommandService.updateGroupName(roomId, newGroupName, requesterId);
+
+        // Fetch members and usernames for response
+        List<MemberAggregate> members = memberCommandService.bulkLoadActiveByRoomId(roomId);
+        Map<UUID, String> userIdToUsername = fetchUsernamesForMembers(members);
+
+        GroupUpdateActionsResponse response = GroupUpdateActionsResponse.fromRoom(
+                savedRoom,
+                userIdToUsername,
+                requesterId
+        );
+
+        logger.info("Group name updated: room_id={}, new_name='{}'", roomId, newGroupName);
+        return response;
+    }
+
+    /**
+     * Update room description and return the response DTO.
+     *
+     * @param roomId the UUID of the room to update
+     * @param newDescription the new description
+     * @param requesterId the UUID of the user performing the update
+     * @return GroupUpdateActionsResponse with operation="update_description"
+     */
+    public GroupUpdateActionsResponse updateDescription(UUID roomId, String newDescription, UUID requesterId) {
+        logger.info("Updating description: room_id={}, requester_id={}", roomId, requesterId);
+
+        RoomAggregate savedRoom = roomCommandService.updateDescription(roomId, newDescription, requesterId);
+
+        // Fetch members and usernames for response
+        List<MemberAggregate> members = memberCommandService.bulkLoadActiveByRoomId(roomId);
+        Map<UUID, String> userIdToUsername = fetchUsernamesForMembers(members);
+
+        GroupUpdateActionsResponse response = GroupUpdateActionsResponse.fromRoom(
+                savedRoom,
+                userIdToUsername,
+                requesterId
+        );
+
+        logger.info("Description updated: room_id={}", roomId);
+        return response;
+    }
+
+  
+
+
+    /**
+     * Update cover image and return the response DTO.
+     *
+     * @param roomId the UUID of the room to update
+     * @param coverImage the new cover image file (optional, multipart)
+     * @param remove if true, explicitly remove the existing cover image
+     * @param requesterId the UUID of the user performing the update
+     * @return GroupUpdateActionsResponse with operation="update_cover_image"
+     */
+    public GroupUpdateActionsResponse updateCoverImage(
+            UUID roomId,
+            MultipartFile coverImage,
+            Boolean remove,
+            UUID requesterId
+    ) {
+        logger.info("Updating cover image: room_id={}, requester_id={}, remove={}", roomId, requesterId, remove);
+
+        // ─────────────────────────────────────────────
+        // Handle image upload or removal
+        // - If remove=true: set URL to null to clear
+        // - If coverImage provided: save via LocalMediaStorageService → get relative path
+        // - Otherwise: keep existing (domain handles null as "no change")
+        // ─────────────────────────────────────────────
+        String newCoverImageUrl = null;
+
+        if (Boolean.TRUE.equals(remove)) {
+            // Explicitly remove the cover image
+            logger.debug("Removing cover image for room: room_id={}", roomId);
+            newCoverImageUrl = null;
+        } else if (coverImage != null && !coverImage.isEmpty()) {
+            // Save new image and get relative path
+            newCoverImageUrl = mediaStorageService.saveGroupCoverImage(coverImage);
+            logger.debug("Cover image saved (relative path): {}", newCoverImageUrl);
+        }
+        // else: no image provided and not removing → pass null, domain keeps existing value
+
+        RoomAggregate savedRoom = roomCommandService.updateCoverImage(roomId, newCoverImageUrl, requesterId);
+
+        // Fetch members and usernames for response
+        List<MemberAggregate> members = memberCommandService.bulkLoadActiveByRoomId(roomId);
+        Map<UUID, String> userIdToUsername = fetchUsernamesForMembers(members);
+
+        GroupUpdateActionsResponse response = GroupUpdateActionsResponse.fromRoom(
+                savedRoom,
+                userIdToUsername,
+                requesterId
+        );
+
+        logger.info("Cover image updated: room_id={}, has_cover_image={}", roomId, response.hasCoverImage());
+        return response;
+    }
+
+    /**
+     * Update profile image and return the response DTO.
+     *
+     * @param roomId the UUID of the room to update
+     * @param profileImage the new profile image file (optional, multipart)
+     * @param remove if true, explicitly remove the existing profile image
+     * @param requesterId the UUID of the user performing the update
+     * @return GroupUpdateActionsResponse with operation="update_profile_image"
+     */
+    public GroupUpdateActionsResponse updateProfileImage(
+            UUID roomId,
+            MultipartFile profileImage,
+            Boolean remove,
+            UUID requesterId
+    ) {
+        logger.info("Updating profile image: room_id={}, requester_id={}, remove={}", roomId, requesterId, remove);
+
+        // ─────────────────────────────────────────────
+        // Handle image upload or removal
+        // - If remove=true: set URL to null to clear
+        // - If profileImage provided: save via LocalMediaStorageService → get relative path
+        // - Otherwise: keep existing (domain handles null as "no change")
+        // ─────────────────────────────────────────────
+        String newProfileImageUrl = null;
+
+        if (Boolean.TRUE.equals(remove)) {
+            // Explicitly remove the profile image
+            logger.debug("Removing profile image for room: room_id={}", roomId);
+            newProfileImageUrl = null;
+        } else if (profileImage != null && !profileImage.isEmpty()) {
+            // Save new image and get relative path
+            newProfileImageUrl = mediaStorageService.saveGroupProfileImage(profileImage);
+            logger.debug("Profile image saved (relative path): {}", newProfileImageUrl);
+        }
+        // else: no image provided and not removing → pass null, domain keeps existing value
+
+        RoomAggregate savedRoom = roomCommandService.updateProfileImage(roomId, newProfileImageUrl, requesterId);
+
+        // Fetch members and usernames for response
+        List<MemberAggregate> members = memberCommandService.bulkLoadActiveByRoomId(roomId);
+        Map<UUID, String> userIdToUsername = fetchUsernamesForMembers(members);
+
+        GroupUpdateActionsResponse response = GroupUpdateActionsResponse.fromRoom(
+                savedRoom,
+                userIdToUsername,
+                requesterId
+        );
+
+        logger.info("Profile image updated: room_id={}, has_profile_image={}", roomId, response.hasProfileImage());
+        return response;
+    }
+
+
+
+
+    // ─────────────────────────────────────────────────────────────────
     // HELPER METHODS
     // ─────────────────────────────────────────────────────────────────
 
@@ -450,5 +642,29 @@ public class RoomCommandHandler {
         return userIdToUser;
     }
 
+    /**
+     * Fetch username strings for a list of member aggregates from external Auth Service.
+     *
+     * <p>Used for GROUP room update responses where only usernames are needed.</p>
+     *
+     * @param members list of MemberAggregate to fetch usernames for
+     * @return map of userId -> username string
+     */
+    private Map<UUID, String> fetchUsernamesForMembers(List<MemberAggregate> members) {
+        Map<UUID, String> userIdToUsername = new HashMap<>();
+        for (MemberAggregate member : members) {
+            try {
+                UserView user = userApiClient.getUserById(member.userId());
+                userIdToUsername.put(member.userId(), user.username());
+            } catch (Exception e) {
+                logger.warn(
+                        "Failed to fetch username for user_id={} (member_id={}): {}",
+                        member.userId(), member.id(), e.getMessage()
+                );
+                userIdToUsername.put(member.userId(), "Unknown");
+            }
+        }
+        return userIdToUsername;
+    }
+
 }
- 
