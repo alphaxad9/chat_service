@@ -68,15 +68,29 @@ curl -X POST http://127.0.0.1:8005/api/messages \
 # 🔐 Authenticated user becomes sender; image saved to /uploads/messages/
 # Response includes absolute image_url after MediaUrlService conversion
 curl -X POST http://127.0.0.1:8005/api/messages/with-image \
-  --cookie "access_token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzc4NjEzMjY0LCJpYXQiOjE3Nzg2MTI5NjQsImp0aSI6IjlmMTljM2Y4NDcwMDQ4MTBiYmViZjE5MmRiY2ZiYTc4IiwidXNlcl9pZCI6IjcxODg1YmJlLTFmNDgtNDJiNi05MGU3LWY5ODhhZjUyMzFkZCJ9.MmIWkxwnYiJ3o-k1oGCyWJMqzGWA-PPr5Yj-iu6IscvNaLYsNeMRvKQ8_oOZt9Gq8zHDyeUYqrrjmmhkd6md_EYiEw-hU0tXP2WxT1472n8_RuO_a_Jen2cGge4U0GCjhbNumfmrmuWvnmmYoYFIkvJw_W0nrgsdq-IdmR7_FW4A1Js5HmtQJHnMxmAh8z5beQppU7XZiBtgna5c4x597SHRbPZ3ZTZSSrCwch6Lwa-ygJmvEsDT-KRJUr_mLfbCBimLt_nEFBOzg0zDYRbGCGYPsvn0JTI_FCnjyUs2fNjDIxQASB2L9kgtV2EyEImsd1tYkoAOTn-0FtVBiM726g" \
+  --cookie "access_token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzc4NjE3MDUwLCJpYXQiOjE3Nzg2MTY3NTAsImp0aSI6IjVjNTRiMGExMzkyZTRmOTFiOGE3ZjQ0NTIzZDYzYWE2IiwidXNlcl9pZCI6IjcxODg1YmJlLTFmNDgtNDJiNi05MGU3LWY5ODhhZjUyMzFkZCJ9.tIZW0NNb5h8cj2VEZKdROy669O_bJTiuDTa3exeUzu9W3TT0PGP8lOwmKcPFE8NwortTTlZy4glzU60UhXWrr8nkjvBwH6aDFo7uFgfzoRrVAMDOBl8JsRftgCdUx3bSw5hhBk8LKgp6nCPcvXzU4xyKPXYQLQqW_fO0kw4nSNpJry59LcmoXnAvCs75t9yKJyNyqigHStyLFcGL1IIqnOT41l84p6px35y3GUo7cm-t9x8nCzk0QO8blmQJZVQww05Q9ZrHUwEYwKTpe3aUj6uFadWI_t_8TPU5QCOdJACbdWImcNXvWVflWvTMeeu1qgysS1eg1uQEFftEcOYxyw" \
+  -F "room_id=ca9ee906-a23a-4e07-9cb5-08684cf3b21a" \
   -F "content=Check out this design mockup for the new feature!" \
-  -F "image=@/home/ishimwe/projs/django/microservices/service_one/zedvye_six/chat_service/my_local_actions/pexels-marros-33143616.jpg" | jq
+  -F "image=@/home/ishimwe/projs/django/microservices/service_one/zedvye_six/chat_service/my_local_actions/pexels-marros-33143616.jpg;type=image/jpeg" \
+  | jq
 
 
+# ───────────────────────────────────────────────────────────────────────────
+# 4. SEND REPLY MESSAGE WITH IMAGE (multipart/form-data)
+# ───────────────────────────────────────────────────────────────────────────
+
+# Reply with both text AND an image attachment
+# 🔐 Tests full flow: image upload, parent preview, unread increment for others
+curl -X POST http://127.0.0.1:8005/api/messages/reply/with-image \
+  --cookie "access_token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzc4NjE3MjgxLCJpYXQiOjE3Nzg2MTY5ODEsImp0aSI6IjY4OTM5YmI3M2Y5ZDRiYzRhNmU5MDM4ZTFjNDRkN2ViIiwidXNlcl9pZCI6IjcxODg1YmJlLTFmNDgtNDJiNi05MGU3LWY5ODhhZjUyMzFkZCJ9.lwXFh6HUefZHqRZYLIyxKgz9Mw-Kh8ABSUC_ODyXHGixTamq_v0x3nFnRsfb8-ldBfkiXnhhKPL6PlvgrxP18gNSpAO2Gb6Ll4k5-kAzMOy06HND_H5doiCT0aZyoavHo2HWyN72o6jJkBITOe9Zq7oFt3wEKWo1LHHuKzvKejuAQZ58QrsTLgGgGHQbT-W2WCjxyxVfgAwKsqFgyH1OL3jDcDe1j6vCMhJGcxEQ9L0pEkV-7UvvPIr8RJdVcJndoD3Hup852tFMNaGomEk07jl8aAh-wiFI4zChduuoe8Eii6Vn2iItYWlItaRjmJTU59bHIHNJFcViQY_UoIn19Q" \
+  -F "room_id=ca9ee906-a23a-4e07-9cb5-08684cf3b21a" \
+  -F "content=Reply with image" \
+  -F "parent_id=6d1a55bd-5dfd-425e-b392-737c7e2c2bb1" \
+  -F "image=@/home/ishimwe/projs/django/microservices/service_one/zedvye_six/chat_service/my_local_actions/pexels-marros-33143616.jpg;type=image/jpeg" \ | jq
 # Send a message with ONLY an image (empty content)
 # Fixed: Send message with ONLY an image
 curl -X POST http://127.0.0.1:8005/api/messages/with-image \
-  --cookie "access_token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzc4NjEzMjY0LCJpYXQiOjE3Nzg2MTI5NjQsImp0aSI6IjlmMTljM2Y4NDcwMDQ4MTBiYmViZjE5MmRiY2ZiYTc4IiwidXNlcl9pZCI6IjcxODg1YmJlLTFmNDgtNDJiNi05MGU3LWY5ODhhZjUyMzFkZCJ9.MmIWkxwnYiJ3o-k1oGCyWJMqzGWA-PPr5Yj-iu6IscvNaLYsNeMRvKQ8_oOZt9Gq8zHDyeUYqrrjmmhkd6md_EYiEw-hU0tXP2WxT1472n8_RuO_a_Jen2cGge4U0GCjhbNumfmrmuWvnmmYoYFIkvJw_W0nrgsdq-IdmR7_FW4A1Js5HmtQJHnMxmAh8z5beQppU7XZiBtgna5c4x597SHRbPZ3ZTZSSrCwch6Lwa-ygJmvEsDT-KRJUr_mLfbCBimLt_nEFBOzg0zDYRbGCGYPsvn0JTI_FCnjyUs2fNjDIxQASB2L9kgtV2EyEImsd1tYkoAOTn-0FtVBiM726g" \
+  --cookie "access_token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzc4NjE3MDUwLCJpYXQiOjE3Nzg2MTY3NTAsImp0aSI6IjVjNTRiMGExMzkyZTRmOTFiOGE3ZjQ0NTIzZDYzYWE2IiwidXNlcl9pZCI6IjcxODg1YmJlLTFmNDgtNDJiNi05MGU3LWY5ODhhZjUyMzFkZCJ9.tIZW0NNb5h8cj2VEZKdROy669O_bJTiuDTa3exeUzu9W3TT0PGP8lOwmKcPFE8NwortTTlZy4glzU60UhXWrr8nkjvBwH6aDFo7uFgfzoRrVAMDOBl8JsRftgCdUx3bSw5hhBk8LKgp6nCPcvXzU4xyKPXYQLQqW_fO0kw4nSNpJry59LcmoXnAvCs75t9yKJyNyqigHStyLFcGL1IIqnOT41l84p6px35y3GUo7cm-t9x8nCzk0QO8blmQJZVQww05Q9ZrHUwEYwKTpe3aUj6uFadWI_t_8TPU5QCOdJACbdWImcNXvWVflWvTMeeu1qgysS1eg1uQEFftEcOYxyw" \
   -F "room_id=ca9ee906-a23a-4e07-9cb5-08684cf3b21a" \
   -F "content=" \
   -F "image=@/home/ishimwe/projs/django/microservices/service_one/zedvye_six/chat_service/my_local_actions/pexels-myburgh-4816921.jpg;type=image/jpeg" | jq
@@ -108,19 +122,6 @@ curl -X POST http://127.0.0.1:8005/api/messages/reply \
     "content": "Love this screenshot! What tool did you use?",
     "parent_id": "660e8400-e29b-41d4-a716-446655440001"
   }' | jq
-
-# ───────────────────────────────────────────────────────────────────────────
-# 4. SEND REPLY MESSAGE WITH IMAGE (multipart/form-data)
-# ───────────────────────────────────────────────────────────────────────────
-
-# Reply with both text AND an image attachment
-# 🔐 Tests full flow: image upload, parent preview, unread increment for others
-curl -X POST http://127.0.0.1:8005/api/messages/reply/with-image \
-  --cookie "access_token=eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzc4NTg1NTMzLCJpYXQiOjE3Nzg1ODUyMzMsImp0aSI6IjNjZDZlMzc1Yzg3NTQ5MTdiNDExMjY2NjZhNzMwZDRkIiwidXNlcl9pZCI6IjllNmM0MTM4LTMxMjktNDg3NS04ZTcyLTI1ZTRjYjA1OTA1ZCJ9.ALrFM5Zo1lxN9kB4WstPR5hV9iIKna_wh0-hKJxVH2JF4FnIQZz5D-CclPSu_xgAl2mfYQ_OUrQU1CFr8hMaWUWd3VX4ImtJtXxY1fkUufnAELqViTTUrl7X8EOc1jZtzpEbncZNdJS9kvc4wJqu5QhZV_eRmQFY7CGsDacAKsbJfqGAk7ZIpSPUmJpfo0DiMif_ei9kXoELaEXcRE_P6U1rOxgSXkWRmL0MkGDiBlwtQy4MzCGU8pZB7qImYU9UKZWkfbZOi-VnkOUN_Sc95sh2foXbZV4ep-jV6fEIVegn5SdDYUXfTJ7IU7lPhZCjeXf9SYyaI9SW8gfHsnqLYw" \
-  -F "room_id=fbe31df8-6136-4ff6-bf6d-3b0f15164270" \
-  -F "content=Here is my revised version based on your feedback" \
-  -F "parent_id=550e8400-e29b-41d4-a716-446655440000" \
-  -F "image=@$HOME/projs/django/microservices/service_one/zedvye_six/chat_service/my_local_actions/pexels-marros-33143616.jpg;type=image/jpeg" | jq
 
 
 # =============================================================================
@@ -225,7 +226,7 @@ curl -X PATCH http://127.0.0.1:8005/api/messages/eebc67b7-6866-482a-a523-0a232f9
 # 🔐 Request format: multipart/form-data with image file part
 # 🔐 Response includes updated absolute image_url
 curl -X PATCH http://127.0.0.1:8005/api/messages/eebc67b7-6866-482a-a523-0a232f9b7996/image \
-  --cookie "access_token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzc4NjEyMTk5LCJpYXQiOjE3Nzg2MTE4OTksImp0aSI6ImZkYjk5OTk2NTIyMTRiOGY4MjEyYjAwYWUyZjg4ZTBlIiwidXNlcl9pZCI6IjcxODg1YmJlLTFmNDgtNDJiNi05MGU3LWY5ODhhZjUyMzFkZCJ9.RlppKinqhBIjfRiSJx_KBgdoep4ljZNjQF8SVPgHju0m4x_LTodG4SyicmcjSccHcGHJhHSJsXL2TbmZZ9mtvzHy62NvtwSSqOiBgHg1-KvX8AE7akX9xokNmw2iUz7uoNlgcWKuJTwPQO3zFipTKqmqNLWWatIE88HGx4g9gHPa1suI_FQAhe9AbQnrIhaNp7-6hNCGXZ-hqLj21lEtmiKZIf9pf07iXSEoK7p2NYsgtN1Hmf-0a0SXTHJJEPsmDXqHkDhxBxdn1jwGR8LZkoEnSaCtEho3ulxHeSi4q7hoefQ5OFhPnEuhS30InAegjkCLALeFeyZHhIUlorRHgg" \
+  --cookie "access_token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzc4NjE2MjE4LCJpYXQiOjE3Nzg2MTU5MTgsImp0aSI6IjhhNjVmYzU3ZDdjNTRlOGFiMGJiODAzNjExZGNiYThmIiwidXNlcl9pZCI6IjcxODg1YmJlLTFmNDgtNDJiNi05MGU3LWY5ODhhZjUyMzFkZCJ9.bz9DJUimHVdUVgsyI4-OfZbmcVE9eGkY9qj-nSJCkhQ0dBc3u6ZXed7eECsrhpI72W8eWy_SePrXykue4biUOehWd2KMe2nQQSS4WbNgUeDXEZEYsqPATNpS9UZFJ-UhVdmte4U0grlOwScexTeczGxd6KXK07L09Zy3bvy9ImMsJrpN3JYPm3UbcaB0eH1v0Z7p_Hq2-JE82ZKjfp9MVdA0u66szRwu3ZGWopQu565b44wVEEMCGIZqjT93G_TCuTXMrhGzeqjTgFReSXU-IZXdFJOmH7gK-ItUcd9Er0Dqn8m276sWrUisk81paYfExgFm0ayeHLkl54OZ_JgkAA" \
   -F "image=@/home/ishimwe/projs/django/microservices/service_one/zedvye_six/chat_service/my_local_actions/pexels-myburgh-4816921.jpg;type=image/jpeg" \
   | jq
 
@@ -306,7 +307,7 @@ curl -X PATCH "http://127.0.0.1:8005/api/messages/eebc67b7-6866-482a-a523-0a232f
 # 🔐 sender_username will be "You" for own messages
 # 🔐 Messages ordered by created_at ascending (oldest first) for chat history
 curl -X GET http://127.0.0.1:8005/api/messages/room/ca9ee906-a23a-4e07-9cb5-08684cf3b21a \
-  --cookie "access_token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzc4NjEyMDg0LCJpYXQiOjE3Nzg2MTE3ODQsImp0aSI6IjdkZWFlYjQzOWJiNDRlMDRhOWE4Y2I5ZTI1YjliY2VhIiwidXNlcl9pZCI6IjcxODg1YmJlLTFmNDgtNDJiNi05MGU3LWY5ODhhZjUyMzFkZCJ9.UEc5y47Xf6dgSMKfPv3_LQhMotnuRZ6GAG-nQ3FfxTPimstlNkWZAcDDlHsxt6_DRu9GfvtjdHmg2cBMyuyRab5BmXG58pNeU503zkLP6JysE9Iyjwgy71Q2bjCyPPCUayG9OhfaGDs5iVijSkesgNn4d__Hvze1rO7xTw28VdbPFQpvEd7yvxcni_P2DfzcsO-bFEwvJGq-dT6VWId41IhWBXMvyl1sIrs9y0bsvM6iZ0AiW3dflO4D6OwlbubPjQ8JIAi8IrvvHkjf1euKlPxfKD_m0HDhsB5NC_UvIq-JapH_UWp4_jI85O1B-F5GLRIFa1urQzUCsPm0UnyhHA" \
+  --cookie "access_token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzc4NjE2MDc1LCJpYXQiOjE3Nzg2MTU3NzUsImp0aSI6IjAzNmUxMzYwODYyNDQxYzlhY2M3ZjVhMTUyNzg4MDJkIiwidXNlcl9pZCI6IjcxODg1YmJlLTFmNDgtNDJiNi05MGU3LWY5ODhhZjUyMzFkZCJ9.Nlo2995JkFWYQkW_ywtzG48Q5XCVQlddZZ3an5nSGULAYJEzPRLcTe6T-SHSspYmfexBHhpiVXwovE_nq1MZjI1L_t1gYugZIrb2uByH3qeYdQAom58zzKAKK1520b-xOA4HvFNQpJlEp9L2kgypSDcg1ui6yqiQnXNNEC_XQJsKavVsq1cdFm6asDgIJ36gBpbPVq76FVBTPkburtc3udVrmTxFE0X9HS7wvQ7PVatR48xEfzaBY1UJ0_cnMpDfdxOaS3ezAq4lEopRbQjTuhZAOM9WVAr8TRZqx1rEYrqONBej26WlmiI-86yWkgXSIXJqbvINvNDu-XFwhf6UkA" \
   | jq
 
 # Expected response structure (array of messages):

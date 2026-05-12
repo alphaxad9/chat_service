@@ -160,11 +160,11 @@ public class MessageCommandController {
             produces = {"application/json"}
     )
     public ResponseEntity<MessageCommandActionsResponse> sendMessageWithImage(
-            @RequestPart("room_id") UUID roomId,
-            @RequestPart(value = "content", required = false) String content,
-            @RequestPart(value = "image", required = false) MultipartFile image,
-            HttpServletRequest request
-    ) {
+        @RequestParam("room_id") UUID roomId,
+        @RequestParam(value = "content", required = false) String content,
+        @RequestPart(value = "image", required = false) MultipartFile image,
+        HttpServletRequest request
+){
         UUID senderId = UserContext
                 .getUserIdAsUuid()
                 .orElseThrow(() -> {
@@ -280,12 +280,12 @@ public class MessageCommandController {
             produces = {"application/json"}
     )
     public ResponseEntity<MessageCommandActionsResponse> sendReplyMessageWithImage(
-            @RequestPart("room_id") UUID roomId,
-            @RequestPart(value = "content", required = false) String content,
-            @RequestPart("parent_id") UUID parentId,
-            @RequestPart(value = "image", required = false) MultipartFile image,
-            HttpServletRequest request
-    ) {
+        @RequestParam("room_id") UUID roomId,
+        @RequestParam(value = "content", required = false) String content,
+        @RequestParam("parent_id") UUID parentId,
+        @RequestPart(value = "image", required = false) MultipartFile image,
+        HttpServletRequest request
+) {
         UUID senderId = UserContext
                 .getUserIdAsUuid()
                 .orElseThrow(() -> {
