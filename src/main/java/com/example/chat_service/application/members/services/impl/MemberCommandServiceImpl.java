@@ -15,7 +15,6 @@ import org.springframework.transaction.annotation.Transactional;
 import com.example.chat_service.application.members.services.MemberCommandServiceInterface;
 import com.example.chat_service.domain.members.MemberAggregate;
 import com.example.chat_service.domain.members.exceptions.InvalidMemberEntityError;
-import com.example.chat_service.domain.members.exceptions.InvalidMemberStatusError;
 import com.example.chat_service.domain.members.exceptions.InvalidUnreadMessagesError;
 import com.example.chat_service.domain.members.exceptions.MemberAlreadyExistsError;
 import com.example.chat_service.domain.members.exceptions.MemberDomainError;
