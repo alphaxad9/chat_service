@@ -1,4 +1,5 @@
 // chat_service/src/main/java/com/example/chat_service/infrastructure/persistence/rooms/repositories/RoomCommandOrmRepository.java
+
 package com.example.chat_service.infrastructure.persistence.rooms.repositories;
 
 import java.util.Collection;
@@ -142,6 +143,14 @@ public class RoomCommandOrmRepository implements RoomCommandRepository {
     }
 
     @Override
+    public Optional<RoomAggregate> loadByCreatorAndFriendId(UUID creatorId, UUID friendId) {
+        // Find DIRECT room by creator and friend, active only
+        return roomJpaRepository.findByCreatorIdAndFriendIdAndTypeAndIsDeletedFalse(
+                creatorId, friendId, RoomEntity.RoomType.DIRECT)
+            .map(RoomMapper::entityToAggregate);
+    }
+
+    @Override
     public boolean exists(UUID roomId) {
         // Base existsById checks all rooms (active + deleted)
         return roomJpaRepository.existsById(roomId);
@@ -153,6 +162,16 @@ public class RoomCommandOrmRepository implements RoomCommandRepository {
         return roomJpaRepository.existsByCreatorIdAndType(
             creatorId,
             RoomEntity.RoomType.fromDomain(type)
+        );
+    }
+
+    @Override
+    public boolean existsByCreatorAndFriendId(UUID creatorId, UUID friendId) {
+        // Check for DIRECT room existence between two users (all states)
+        return roomJpaRepository.existsByCreatorIdAndFriendIdAndType(
+            creatorId,
+            friendId,
+            RoomEntity.RoomType.DIRECT
         );
     }
 

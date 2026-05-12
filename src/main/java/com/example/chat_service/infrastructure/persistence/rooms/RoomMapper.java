@@ -1,4 +1,3 @@
-// chat_service/src/main/java/com/example/chat_service/infrastructure/persistence/rooms/RoomMapper.java
 package com.example.chat_service.infrastructure.persistence.rooms;
 
 import com.example.chat_service.domain.rooms.Room;
@@ -36,6 +35,7 @@ public final class RoomMapper {
         return new RoomEntity(
             room.id(),
             room.creatorId(),
+            room.friendId(),
             RoomEntity.RoomType.fromDomain(room.type()),
             room.groupName(),
             room.description(),
@@ -78,6 +78,7 @@ public final class RoomMapper {
             entity.getId(),
             entity.getCreatorId(),
             entity.getType().toDomain(),
+            entity.getFriendId(),
             entity.getGroupName(),
             entity.getDescription(),
             entity.getCoverImageUrl(),
@@ -100,6 +101,7 @@ public final class RoomMapper {
         return new RoomEntity(
             domain.id(),
             domain.creatorId(),
+            domain.friendId(),
             RoomEntity.RoomType.fromDomain(domain.type()),
             domain.groupName(),
             domain.description(),

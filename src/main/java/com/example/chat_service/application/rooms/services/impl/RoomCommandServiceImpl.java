@@ -1,5 +1,3 @@
-// chat_service/src/main/java/com/example/chat_service/application/rooms/services/impl/RoomCommandServiceImpl.java
-
 package com.example.chat_service.application.rooms.services.impl;
 
 import java.util.Collection;
@@ -766,6 +764,48 @@ public class RoomCommandServiceImpl implements RoomCommandServiceInterface {
     }
 
     @Override
+    public Optional<RoomAggregate> loadByCreatorAndFriendId(UUID creatorId, UUID friendId) {
+        try {
+            Optional<RoomAggregate> result = roomCommandRepository.loadByCreatorAndFriendId(creatorId, friendId);
+            
+            if (result.isPresent()) {
+                logger.debug(
+                    "Loaded DIRECT room by creator+friend: creator_id={}, friend_id={}, room_id={}",
+                    creatorId,
+                    friendId,
+                    result.get().room().id()
+                );
+            } else {
+                logger.debug(
+                    "No DIRECT room found by creator+friend: creator_id={}, friend_id={}",
+                    creatorId,
+                    friendId
+                );
+            }
+            
+            return result;
+
+        } catch (RoomDomainError e) {
+            logger.warn(
+                "Domain error loading room by creator+friend: creator_id={}, friend_id={}, error={}",
+                creatorId,
+                friendId,
+                e.getMessage()
+            );
+            throw e;
+
+        } catch (Exception e) {
+            logger.error(
+                "Unexpected error loading room by creator+friend: creator_id={}, friend_id={}",
+                creatorId,
+                friendId,
+                e
+            );
+            throw e;
+        }
+    }
+
+    @Override
     public boolean aggregateExists(UUID roomId) {
         try {
             boolean exists = roomCommandRepository.exists(roomId);
@@ -795,6 +835,29 @@ public class RoomCommandServiceImpl implements RoomCommandServiceInterface {
                 "Unexpected error checking room existence by creator+type: creator_id={}, type={}",
                 creatorId,
                 type,
+                e
+            );
+            throw e;
+        }
+    }
+
+    @Override
+    public boolean existsByCreatorAndFriendId(UUID creatorId, UUID friendId) {
+        try {
+            boolean exists = roomCommandRepository.existsByCreatorAndFriendId(creatorId, friendId);
+            logger.debug(
+                "Existence check by creator+friend: creator_id={}, friend_id={}, exists={}",
+                creatorId,
+                friendId,
+                exists
+            );
+            return exists;
+
+        } catch (Exception e) {
+            logger.error(
+                "Unexpected error checking room existence by creator+friend: creator_id={}, friend_id={}",
+                creatorId,
+                friendId,
                 e
             );
             throw e;

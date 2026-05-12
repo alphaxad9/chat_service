@@ -17,6 +17,7 @@ public final class Room {
     private final UUID id;                    // Room ID (primary key)
     private final UUID creatorId;             // Reference to room creator (transferable)
     private final Type type;                  // Room type: GROUP or DIRECT
+    private final UUID friendId;              // Reference to other participant (required only for DIRECT rooms)
     private final LocalDateTime lastActivityAt; // Last interaction timestamp for ordering
     
     // Optional images (nullable) - used for display in UI
@@ -43,7 +44,7 @@ public final class Room {
      * Public constructor for domain creation and infrastructure mapping.
      * All arguments are validated to ensure domain invariants.
      */
-    public Room(UUID id, UUID creatorId, Type type,
+    public Room(UUID id, UUID creatorId, Type type, UUID friendId,
                 String groupName, String description,
                 String coverImageUrl, String profileImageUrl,
                 LocalDateTime lastActivityAt,
@@ -56,6 +57,18 @@ public final class Room {
         if (lastActivityAt == null) throw new IllegalArgumentException("lastActivityAt cannot be null");
         if (createdAt == null) throw new IllegalArgumentException("createdAt cannot be null");
         if (updatedAt == null) throw new IllegalArgumentException("updatedAt cannot be null");
+
+        // DIRECT room invariant: friendId is required for DIRECT rooms
+        if (type == Type.DIRECT) {
+            if (friendId == null) {
+                throw new IllegalArgumentException("friendId is required for DIRECT rooms");
+            }
+        } else {
+            // GROUP rooms should not have friendId set
+            if (friendId != null) {
+                throw new IllegalArgumentException("friendId should be null for GROUP rooms");
+            }
+        }
 
         // Group-specific invariant: groupName is required and non-empty for GROUP rooms
         if (type == Type.GROUP) {
@@ -83,6 +96,7 @@ public final class Room {
         this.id = id;
         this.creatorId = creatorId;
         this.type = type;
+        this.friendId = friendId;
         this.groupName = groupName;  // null allowed for DIRECT rooms
         this.description = description;
         this.coverImageUrl = coverImageUrl;
@@ -105,7 +119,7 @@ public final class Room {
     public static Room createGroup(UUID id, UUID creatorId, String groupName, String description,
                                    String coverImageUrl, String profileImageUrl) {
         LocalDateTime now = LocalDateTime.now();
-        return new Room(id, creatorId, Type.GROUP,
+        return new Room(id, creatorId, Type.GROUP, null,
                        groupName, description, coverImageUrl, profileImageUrl, 
                        now, now, now, false);
     }
@@ -113,10 +127,10 @@ public final class Room {
     /**
      * Create a new DIRECT message room (no group metadata, no images).
      */
-    public static Room createDirect(UUID id, UUID creatorId, UUID otherParticipantId) {
+    public static Room createDirect(UUID id, UUID creatorId, UUID friendId) {
         LocalDateTime now = LocalDateTime.now();
         String metaDescription = "Direct conversation";
-        return new Room(id, creatorId, Type.DIRECT,
+        return new Room(id, creatorId, Type.DIRECT, friendId,
                        null, metaDescription, null, null, now, now, now, false);
     }
 
@@ -124,6 +138,7 @@ public final class Room {
     public UUID id() { return id; }
     public UUID creatorId() { return creatorId; }
     public Type type() { return type; }
+    public UUID friendId() { return friendId; }
     public LocalDateTime lastActivityAt() { return lastActivityAt; }
     public String coverImageUrl() { return coverImageUrl; }
     public String profileImageUrl() { return profileImageUrl; }
@@ -171,7 +186,7 @@ public final class Room {
         if (Objects.equals(this.creatorId, newCreatorId)) {
             return this; // No change needed
         }
-        return new Room(this.id, newCreatorId, this.type,
+        return new Room(this.id, newCreatorId, this.type, this.friendId,
                        this.groupName, this.description,
                        this.coverImageUrl, this.profileImageUrl,
                        this.lastActivityAt, this.createdAt, LocalDateTime.now(), this.isDeleted);
@@ -181,7 +196,7 @@ public final class Room {
      * Update the last activity timestamp (call when new message/member action occurs).
      */
     public Room updateLastActivity() {
-        return new Room(this.id, this.creatorId, this.type,
+        return new Room(this.id, this.creatorId, this.type, this.friendId,
                        this.groupName, this.description,
                        this.coverImageUrl, this.profileImageUrl,
                        LocalDateTime.now(), this.createdAt, LocalDateTime.now(), this.isDeleted);
@@ -209,7 +224,7 @@ public final class Room {
         if (Objects.equals(this.groupName, newGroupName)) {
             return this; // No change needed
         }
-        return new Room(this.id, this.creatorId, this.type,
+        return new Room(this.id, this.creatorId, this.type, this.friendId,
                        newGroupName, this.description,
                        this.coverImageUrl, this.profileImageUrl,
                        this.lastActivityAt, this.createdAt, LocalDateTime.now(), this.isDeleted);
@@ -232,7 +247,7 @@ public final class Room {
         if (Objects.equals(this.description, newDescription)) {
             return this; // No change needed
         }
-        return new Room(this.id, this.creatorId, this.type,
+        return new Room(this.id, this.creatorId, this.type, this.friendId,
                        this.groupName, newDescription,
                        this.coverImageUrl, this.profileImageUrl,
                        this.lastActivityAt, this.createdAt, LocalDateTime.now(), this.isDeleted);
@@ -256,7 +271,7 @@ public final class Room {
         if (Objects.equals(this.profileImageUrl, newProfileImageUrl)) {
             return this; // No change needed
         }
-        return new Room(this.id, this.creatorId, this.type,
+        return new Room(this.id, this.creatorId, this.type, this.friendId,
                        this.groupName, this.description,
                        this.coverImageUrl, newProfileImageUrl,
                        this.lastActivityAt, this.createdAt, LocalDateTime.now(), this.isDeleted);
@@ -280,7 +295,7 @@ public final class Room {
         if (Objects.equals(this.coverImageUrl, newCoverImageUrl)) {
             return this; // No change needed
         }
-        return new Room(this.id, this.creatorId, this.type,
+        return new Room(this.id, this.creatorId, this.type, this.friendId,
                        this.groupName, this.description,
                        newCoverImageUrl, this.profileImageUrl,
                        this.lastActivityAt, this.createdAt, LocalDateTime.now(), this.isDeleted);
@@ -290,7 +305,7 @@ public final class Room {
      * Soft-delete or restore the room.
      */
     public Room toggleDeletion() {
-        return new Room(this.id, this.creatorId, this.type,
+        return new Room(this.id, this.creatorId, this.type, this.friendId,
                        this.groupName, this.description,
                        this.coverImageUrl, this.profileImageUrl,
                        this.lastActivityAt, this.createdAt, LocalDateTime.now(), !this.isDeleted);
@@ -300,7 +315,7 @@ public final class Room {
      * Update only the updatedAt timestamp (metadata refresh without state change).
      */
     public Room touch() {
-        return new Room(this.id, this.creatorId, this.type,
+        return new Room(this.id, this.creatorId, this.type, this.friendId,
                        this.groupName, this.description,
                        this.coverImageUrl, this.profileImageUrl,
                        this.lastActivityAt, this.createdAt, LocalDateTime.now(), this.isDeleted);
@@ -325,6 +340,7 @@ public final class Room {
                 "id=" + id +
                 ", creatorId=" + creatorId +
                 ", type=" + type +
+                ", friendId=" + friendId +
                 ", isGroup=" + isGroup() +
                 ", groupName='" + groupName + '\'' +
                 ", hasCoverImage=" + hasCoverImage() +

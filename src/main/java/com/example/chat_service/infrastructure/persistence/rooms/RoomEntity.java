@@ -1,4 +1,5 @@
 // chat_service/src/main/java/com/example/chat_service/infrastructure/persistence/rooms/RoomEntity.java
+
 package com.example.chat_service.infrastructure.persistence.rooms;
 
 import jakarta.persistence.*;
@@ -69,7 +70,17 @@ import java.util.UUID;
         // Minimal fields for global activity feed rendering
         @Index(name = "idx_rooms_activity_summary", columnList = "is_deleted, last_activity_at DESC, type, group_name, profile_image_url, creator_id"),
         // Minimal fields for group name search results
-        @Index(name = "idx_rooms_name_summary", columnList = "group_name, is_deleted, type, last_activity_at, profile_image_url, creator_id")
+        @Index(name = "idx_rooms_name_summary", columnList = "group_name, is_deleted, type, last_activity_at, profile_image_url, creator_id"),
+        
+        // ── Direct Message Room Lookup Indexes ─────────────────────────
+        // Query direct rooms by creator and friend (find conversation between two users)
+        @Index(name = "idx_rooms_creator_friend", columnList = "creator_id, friend_id"),
+        // Active direct rooms by creator and friend (most common lookup pattern)
+        @Index(name = "idx_rooms_creator_friend_active", columnList = "creator_id, friend_id, is_deleted"),
+        // Active direct rooms by creator, friend, and activity (for ordered feeds)
+        @Index(name = "idx_rooms_creator_friend_activity", columnList = "creator_id, friend_id, is_deleted, last_activity_at DESC"),
+        // Reverse lookup: find rooms where user is the friend participant
+        @Index(name = "idx_rooms_friend_creator_active", columnList = "friend_id, creator_id, is_deleted")
     }
 )
 // Hibernate 6+: Auto-filter deleted rooms in queries (replaces @Where)
@@ -82,6 +93,9 @@ public class RoomEntity {
 
     @Column(name = "creator_id", nullable = false, columnDefinition = "UUID")
     private UUID creatorId;
+
+    @Column(name = "friend_id", columnDefinition = "UUID")
+    private UUID friendId;  // Required only for DIRECT rooms, null for GROUP rooms
 
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
@@ -119,7 +133,7 @@ public class RoomEntity {
     }
 
     // ── Constructor for Domain Mapping ───────────────────────────────
-    public RoomEntity(UUID id, UUID creatorId, RoomType type,
+    public RoomEntity(UUID id, UUID creatorId, UUID friendId, RoomType type,
                       String groupName, String description,
                       String coverImageUrl, String profileImageUrl,
                       LocalDateTime lastActivityAt,
@@ -127,6 +141,7 @@ public class RoomEntity {
                       boolean isDeleted) {
         this.id = Objects.requireNonNull(id, "id cannot be null");
         this.creatorId = Objects.requireNonNull(creatorId, "creatorId cannot be null");
+        this.friendId = friendId;  // null allowed for GROUP rooms
         this.type = Objects.requireNonNull(type, "type cannot be null");
         this.groupName = groupName;  // null allowed for DIRECT rooms
         this.description = description;
@@ -141,6 +156,7 @@ public class RoomEntity {
     // ── Getters (JPA uses field access, but getters useful for mapping) ─
     public UUID getId() { return id; }
     public UUID getCreatorId() { return creatorId; }
+    public UUID getFriendId() { return friendId; }
     public RoomType getType() { return type; }
     public String getGroupName() { return groupName; }
     public String getDescription() { return description; }
@@ -152,6 +168,10 @@ public class RoomEntity {
     public boolean isDeleted() { return isDeleted; }
 
     // ── Setters for JPA/Hibernate (package-private for controlled access) ─
+    void setFriendId(UUID friendId) {
+        this.friendId = friendId;
+    }
+
     void setGroupName(String groupName) {
         this.groupName = groupName;
     }
@@ -202,6 +222,7 @@ public class RoomEntity {
         RoomEntity entity = new RoomEntity();
         entity.id = domain.id();
         entity.creatorId = domain.creatorId();
+        entity.friendId = domain.friendId();
         entity.type = RoomType.fromDomain(domain.type());
         entity.groupName = domain.groupName();
         entity.description = domain.description();
@@ -223,6 +244,7 @@ public class RoomEntity {
             this.id,
             this.creatorId,
             this.type.toDomain(),
+            this.friendId,
             this.groupName,
             this.description,
             this.coverImageUrl,
@@ -252,6 +274,7 @@ public class RoomEntity {
         return "RoomEntity{" +
                 "id=" + id +
                 ", creatorId=" + creatorId +
+                ", friendId=" + friendId +
                 ", type=" + type +
                 ", groupName='" + groupName + '\'' +
                 ", hasCoverImage=" + (coverImageUrl != null) +

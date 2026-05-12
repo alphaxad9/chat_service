@@ -3,6 +3,7 @@ package com.example.chat_service.infrastructure.persistence.rooms.jpa;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -57,6 +58,33 @@ public interface RoomCommandJpaRepository extends JpaRepository<RoomEntity, UUID
      * @return {@code true} if an active room exists with matching criteria
      */
     boolean existsByCreatorIdAndTypeAndIsDeletedFalse(UUID creatorId, RoomEntity.RoomType type);
+
+    /**
+     * Find an active DIRECT room by creator ID and friend ID.
+     *
+     * <p>Filters to {@code isDeleted = false} and {@code type = DIRECT} via method name derivation.
+     * Used by {@code loadByCreatorAndFriendId()} in command repository.</p>
+     *
+     * @param creatorId the UUID of the room creator
+     * @param friendId the UUID of the other participant in the direct conversation
+     * @param type the room type (should be DIRECT)
+     * @return Optional containing the room entity if found, empty otherwise
+     */
+    Optional<RoomEntity> findByCreatorIdAndFriendIdAndTypeAndIsDeletedFalse(
+            UUID creatorId, UUID friendId, RoomEntity.RoomType type);
+
+    /**
+     * Check existence of a DIRECT room by creator ID and friend ID.
+     *
+     * <p>Checks all rooms regardless of deletion status.
+     * Used by {@code existsByCreatorAndFriendId()} in command repository.</p>
+     *
+     * @param creatorId the UUID of the room creator
+     * @param friendId the UUID of the other participant
+     * @param type the room type (should be DIRECT)
+     * @return {@code true} if a room (active or deleted) exists with matching criteria
+     */
+    boolean existsByCreatorIdAndFriendIdAndType(UUID creatorId, UUID friendId, RoomEntity.RoomType type);
 
     /**
      * Load all active rooms created by a specific user.

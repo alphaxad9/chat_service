@@ -1,5 +1,3 @@
-// chat_service/src/main/java/com/example/chat_service/application/rooms/services/RoomCommandServiceInterface.java
-
 package com.example.chat_service.application.rooms.services;
 
 import java.util.Collection;
@@ -270,6 +268,18 @@ public interface RoomCommandServiceInterface {
     Optional<RoomAggregate> loadAggregateOptional(UUID roomId);
 
     /**
+     * Load a DIRECT room aggregate by creator ID and friend ID.
+     *
+     * @param creatorId the unique identifier of the room creator
+     * @param friendId the unique identifier of the other participant in the direct conversation
+     * @return the loaded room aggregate if found, otherwise {@link Optional#empty()}
+     *
+     * <p>Useful for finding or checking existence of a direct message conversation between two users.
+     * This method only returns DIRECT type rooms; GROUP rooms will never match this query.</p>
+     */
+    Optional<RoomAggregate> loadByCreatorAndFriendId(UUID creatorId, UUID friendId);
+
+    /**
      * Check if a room aggregate exists by ID (fast existence check).
      *
      * @param roomId the UUID of the room
@@ -288,6 +298,18 @@ public interface RoomCommandServiceInterface {
      * without loading full aggregate state.</p>
      */
     boolean aggregateExistsByCreatorAndType(UUID creatorId, Room.Type type);
+
+    /**
+     * Check whether a DIRECT room exists between two users.
+     *
+     * @param creatorId the unique identifier of the room creator
+     * @param friendId the unique identifier of the other participant
+     * @return {@code true} if a DIRECT room exists between these users, {@code false} otherwise
+     *
+     * <p>Optimized existence check for preventing duplicate direct message rooms.
+     * More efficient than loading the full aggregate when only existence matters.</p>
+     */
+    boolean existsByCreatorAndFriendId(UUID creatorId, UUID friendId);
 
     // ── Bulk Read Operations (for command orchestration & read models) ─
 

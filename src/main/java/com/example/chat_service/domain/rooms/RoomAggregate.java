@@ -103,7 +103,7 @@ public final class RoomAggregate {
     public static RoomAggregate createNewDirect(
             UUID id,
             UUID creatorId,
-            UUID otherParticipantId,
+            UUID friendId,
             LocalDateTime createdAt
     ) {
         if (id == null) {
@@ -112,19 +112,19 @@ public final class RoomAggregate {
         if (creatorId == null) {
             throw new InvalidRoomEntityError(id, null, Room.Type.DIRECT.name(), "Creator ID cannot be null");
         }
-        if (otherParticipantId == null) {
-            throw new InvalidRoomEntityError(id, creatorId, Room.Type.DIRECT.name(), "Other participant ID cannot be null for DIRECT room");
+        if (friendId == null) {
+            throw new InvalidRoomEntityError(id, creatorId, Room.Type.DIRECT.name(), "friendId cannot be null for DIRECT room");
         }
 
-        Room newRoom = Room.createDirect(id, creatorId, otherParticipantId);
+        Room newRoom = Room.createDirect(id, creatorId, friendId);
         return new RoomAggregate(newRoom);
     }
 
     /**
      * Convenience overload using current timestamp.
      */
-    public static RoomAggregate createNewDirect(UUID id, UUID creatorId, UUID otherParticipantId) {
-        return createNewDirect(id, creatorId, otherParticipantId, null);
+    public static RoomAggregate createNewDirect(UUID id, UUID creatorId, UUID friendId) {
+        return createNewDirect(id, creatorId, friendId, null);
     }
 
     // ── Business Operations ──────────────────────────────────────────
@@ -379,6 +379,7 @@ public final class RoomAggregate {
 
     public UUID id() { return room.id(); }
     public UUID creatorId() { return room.creatorId(); }
+    public UUID friendId() { return room.friendId(); }
     public Room.Type type() { return room.type(); }
     public LocalDateTime lastActivityAt() { return room.lastActivityAt(); }
     public String groupName() { return room.groupName(); }
@@ -453,6 +454,7 @@ public final class RoomAggregate {
         return "RoomAggregate{" +
                 "id=" + room.id() +
                 ", creatorId=" + room.creatorId() +
+                ", friendId=" + room.friendId() +
                 ", type=" + room.type() +
                 ", isGroup=" + isGroup() +
                 ", groupName='" + room.groupName() + '\'' +
