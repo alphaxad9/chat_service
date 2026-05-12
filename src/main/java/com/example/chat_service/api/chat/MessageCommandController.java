@@ -319,6 +319,214 @@ public class MessageCommandController {
     }
 
     // ─────────────────────────────────────────────────────────────────
+    // MESSAGE UPDATE ACTIONS (return MessageCommandActionsResponse)
+    // ─────────────────────────────────────────────────────────────────
+
+    /**
+     * Delete a message (soft-delete).
+     *
+     * <p><strong>Authorization:</strong> Only the message sender can delete their own message.</p>
+     *
+     * @param messageId the UUID of the message to delete (path variable)
+     * @return MessageCommandActionsResponse with is_deleted=true
+     */
+    @DeleteMapping("/{message_id}")
+    public ResponseEntity<MessageCommandActionsResponse> deleteMessage(
+            @PathVariable("message_id") UUID messageId,
+            HttpServletRequest request
+    ) {
+        UUID actorId = UserContext
+                .getUserIdAsUuid()
+                .orElseThrow(() -> {
+                    logger.error("Unauthorized: No authenticated user found for deleteMessage");
+                    return new RuntimeException("Unauthorized: No authenticated user found in context");
+                });
+
+        logger.info("Deleting message: message_id={}, actor_id={}", messageId, actorId);
+
+        MessageCommandActionsResponse response = messageCommandHandler.deleteMessage(messageId, actorId);
+
+        response = convertImageUrlsToAbsolute(response, request);
+
+        logger.info("Message deleted: message_id={}, is_deleted={}", messageId, response.isDeleted());
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Mark a message as RECEIVED (delivered to recipient's device).
+     *
+     * <p><strong>Authorization:</strong> Only the message receiver (NOT the sender) can mark as received.</p>
+     *
+     * @param messageId the UUID of the message to mark (path variable)
+     * @return MessageCommandActionsResponse with status="RECEIVED"
+     */
+    @PatchMapping("/{message_id}/received")
+    public ResponseEntity<MessageCommandActionsResponse> markAsReceived(
+            @PathVariable("message_id") UUID messageId,
+            HttpServletRequest request
+    ) {
+        UUID actorId = UserContext
+                .getUserIdAsUuid()
+                .orElseThrow(() -> {
+                    logger.error("Unauthorized: No authenticated user found for markAsReceived");
+                    return new RuntimeException("Unauthorized: No authenticated user found in context");
+                });
+
+        logger.info("Marking message as RECEIVED: message_id={}, actor_id={}", messageId, actorId);
+
+        MessageCommandActionsResponse response = messageCommandHandler.markAsReceived(messageId, actorId);
+
+        response = convertImageUrlsToAbsolute(response, request);
+
+        logger.info("Message marked as RECEIVED: message_id={}, status={}", messageId, response.status());
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Mark a message as SEEN (read by recipient).
+     *
+     * <p><strong>Authorization:</strong> Only the message receiver (NOT the sender) can mark as seen.</p>
+     *
+     * @param messageId the UUID of the message to mark (path variable)
+     * @return MessageCommandActionsResponse with status="SEEN" and seen_at timestamp
+     */
+    @PatchMapping("/{message_id}/seen")
+    public ResponseEntity<MessageCommandActionsResponse> markAsSeen(
+            @PathVariable("message_id") UUID messageId,
+            HttpServletRequest request
+    ) {
+        UUID actorId = UserContext
+                .getUserIdAsUuid()
+                .orElseThrow(() -> {
+                    logger.error("Unauthorized: No authenticated user found for markAsSeen");
+                    return new RuntimeException("Unauthorized: No authenticated user found in context");
+                });
+
+        logger.info("Marking message as SEEN: message_id={}, actor_id={}", messageId, actorId);
+
+        MessageCommandActionsResponse response = messageCommandHandler.markAsSeen(messageId, actorId);
+
+        response = convertImageUrlsToAbsolute(response, request);
+
+        logger.info("Message marked as SEEN: message_id={}, status={}, seen_at={}", 
+                messageId, response.status(), response.createdAt());
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Update message content (edit text).
+     *
+     * <p><strong>Authorization:</strong> Only the message sender can edit their own message.</p>
+     *
+     * <p><strong>Request body (application/json):</strong>
+     * <pre>{@code
+     * {
+     *   "new_content": "Updated message text here"
+     * }
+     * }</pre>
+     * </p>
+     *
+     * @param messageId the UUID of the message to update (path variable)
+     * @return MessageCommandActionsResponse with updated content
+     */
+    @PatchMapping(
+            path = "/{message_id}/content",
+            consumes = {"application/json"},
+            produces = {"application/json"}
+    )
+    public ResponseEntity<MessageCommandActionsResponse> updateContent(
+            @PathVariable("message_id") UUID messageId,
+            @RequestBody UpdateContentRequest requestDto,
+            HttpServletRequest request
+    ) {
+        UUID actorId = UserContext
+                .getUserIdAsUuid()
+                .orElseThrow(() -> {
+                    logger.error("Unauthorized: No authenticated user found for updateContent");
+                    return new RuntimeException("Unauthorized: No authenticated user found in context");
+                });
+
+        logger.info("Updating message content: message_id={}, actor_id={}, content_length={}", 
+                messageId, actorId, requestDto.newContent() != null ? requestDto.newContent().length() : 0);
+
+        MessageCommandActionsResponse response = messageCommandHandler.updateContent(
+                messageId,
+                requestDto.newContent(),
+                actorId
+        );
+
+        response = convertImageUrlsToAbsolute(response, request);
+
+        logger.info("Message content updated: message_id={}, content_length={}", 
+                messageId, response.content().length());
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Update message image (edit or remove attachment).
+     *
+     * <p><strong>Authorization:</strong> Only the message sender can update their own message image.</p>
+     *
+     * <p><strong>Request format (multipart/form-data):</strong>
+     * <ul>
+     *   <li>{@code image}: New image file to attach (optional, file part)</li>
+     *   <li>{@code remove}: Set to {@code true} to explicitly remove the existing image (optional, query param)</li>
+     * </ul>
+     * </p>
+     *
+     * <p><strong>Behavior:</strong>
+     * <ul>
+     *   <li>If {@code image} is provided: upload new image and replace existing</li>
+     *   <li>If {@code remove=true}: clear the image URL (set to null)</li>
+     *   <li>If neither: no change to image (domain keeps existing value)</li>
+     * </ul>
+     * </p>
+     *
+     * @param messageId the UUID of the message to update (path variable)
+     * @param image the new image file (optional, multipart)
+     * @param remove if true, explicitly remove the existing image (optional, query param)
+     * @return MessageCommandActionsResponse with updated image_url and has_image flag
+     */
+    @PatchMapping(
+            path = "/{message_id}/image",
+            consumes = {"multipart/form-data"},
+            produces = {"application/json"}
+    )
+    public ResponseEntity<MessageCommandActionsResponse> updateImage(
+            @PathVariable("message_id") UUID messageId,
+            @RequestPart(value = "image", required = false) MultipartFile image,
+            @RequestParam(value = "remove", required = false) Boolean remove,
+            HttpServletRequest request
+    ) {
+        UUID actorId = UserContext
+                .getUserIdAsUuid()
+                .orElseThrow(() -> {
+                    logger.error("Unauthorized: No authenticated user found for updateImage");
+                    return new RuntimeException("Unauthorized: No authenticated user found in context");
+                });
+
+        logger.info("Updating message image: message_id={}, actor_id={}, remove={}", 
+                messageId, actorId, remove);
+
+        // If remove=true, pass null to handler to clear the image
+        // If image is provided, pass the MultipartFile to handler for upload
+        // If neither, pass null (handler keeps existing value)
+        MultipartFile imageToProcess = Boolean.TRUE.equals(remove) ? null : image;
+
+        MessageCommandActionsResponse response = messageCommandHandler.updateImage(
+                messageId,
+                imageToProcess,
+                actorId
+        );
+
+        response = convertImageUrlsToAbsolute(response, request);
+
+        logger.info("Message image updated: message_id={}, has_image={}", 
+                messageId, response.hasImage());
+        return ResponseEntity.ok(response);
+    }
+
+    // ─────────────────────────────────────────────────────────────────
     // HELPER METHODS
     // ─────────────────────────────────────────────────────────────────
 
@@ -390,5 +598,12 @@ public class MessageCommandController {
             @JsonProperty("room_id") UUID roomId,
             @JsonProperty("content") String content,
             @JsonProperty("parent_id") UUID parentId
+    ) {}
+
+    /**
+     * Request DTO for updating message content.
+     */
+    public record UpdateContentRequest(
+            @JsonProperty("new_content") String newContent
     ) {}
 }

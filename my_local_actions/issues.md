@@ -1,99 +1,302 @@
-(give me full code file // chat_service/src/main/java/com/example/chat_service/application/rooms/handlers/RoomCommandHandler.java
-
-package com.example.chat_service.application.rooms.handlers;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
-import java.util.stream.Collectors;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Component;
-import org.springframework.web.multipart.MultipartFile;
-
-import com.example.chat_service.application.rooms.handlers.dtos.GroupCreationResponse;
-import com.example.chat_service.application.rooms.handlers.dtos.PrivateRoomCreationResponse;
-import com.example.chat_service.application.rooms.services.RoomCommandServiceInterface;
-import com.example.chat_service.application.members.services.MemberCommandServiceInterface;
-import com.example.chat_service.domain.rooms.RoomAggregate;
-import com.example.chat_service.domain.members.MemberAggregate;
-import com.example.chat_service.external.users.dtos.UserView;
-import com.example.chat_service.external.users.dtos.users.services.UserApiClient;
-import com.example.chat_service.infrastructure.media.LocalMediaStorageService;
-
-/**
- * Application-layer orchestrator for room commands.
- *
- * <p>Responsibilities:
- * <ul>
- *   <li>Create/load room aggregates using domain factories</li>
- *   <li>Delegate persistence to command services (Room + Member)</li>
- *   <li>Handle media uploads via LocalMediaStorageService</li>
- *   <li>Fetch external user data via UserApiClient</li>
- *   <li>Build enriched API DTO responses (GroupCreationResponse, PrivateRoomCreationResponse)</li>
- *   <li>Coordinate group room creation with bulk member creation</li>
- *   <li>Handle DIRECT room deduplication via bidirectional creator+friend lookup</li>
- * </ul>
- * </p>
- *
- * <p><strong>DOES NOT:</strong>
- * <ul>
- *   <li>Contain domain business rules (delegated to RoomAggregate/MemberAggregate)</li>
- *   <li>Directly access database (delegated to Repositories via Services)</li>
- *   <li>Build absolute URLs — that's handled at the controller layer via MediaUrlService</li>
- * </ul>
- * </p>
- *
- * <p><strong>Architecture note:</strong> This handler returns DTOs with RELATIVE image paths
- * (as stored in the domain/database). The controller layer is responsible for converting
- * these to absolute URLs using {@code MediaUrlService.buildMediaUrl(HttpServletRequest, String)}.
- * This mirrors the pattern used in {@code PostCommandHandler}.</p>
- *
- * <p><strong>DIRECT room deduplication:</strong> Before creating a new DIRECT room,
- * the handler checks BOTH orderings of creator+friend using {@code loadByCreatorAndFriendId}.
- * If either lookup finds an existing room, that room is returned to prevent duplicate
- * conversations between the same two users.</p>
- *
- * <p><strong>Group room participant validation:</strong> When creating a GROUP room,
- * the handler requires at least 2 participant IDs (excluding the creator). It then
- * creates member records for all participants in a single transactional flow.</p>
- */
-@Component
-public class RoomCommandHandler {
-
-    private static final Logger logger =
-            LoggerFactory.getLogger(RoomCommandHandler.class);
-
-    private final RoomCommandServiceInterface roomCommandService;
-    private final MemberCommandServiceInterface memberCommandService;
-    private final UserApiClient userApiClient;
-    private final LocalMediaStorageService mediaStorageService;
+still i get (ishimwe@alpha:~/projs/django/microservices/service_one/zedvye_six/chat_service$ curl -X POST http://127.0.0.1:8000/zedvye_one/users/token/   -H "Content-Type: application/json"   -H "X-CSRFToken: EW8jqY3yDI8veaqY8kUXPT31p5NxLGKrCx4CX7zeXLxa2oETl7pBT57dlvZkLSpa"   -c cookies.txt -b cookies.txt   -d '{                                                                                             "identifier": "test9@example.com",                                                                                                "password": "Test123!"                                                                                                          }' | jq
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100  1524  100  1453  100    71    876     42  0:00:01  0:00:01 --:--:--   918
+{
+  "message": "testuser9 logged in successfully",
+  "user": {
+    "id": "71885bbe-1f48-42b6-90e7-f988af5231dd",
+    "username": "testuser9",
+    "email": "test9@example.com",
+    "first_name": "John",
+    "last_name": "Doe",
+    "profile_picture": "/media/profile_pictures/pexels-budget-bizar-92378004-18879101.jpg"
+  },
+  "access": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzc4NjA4NjU5LCJpYXQiOjE3Nzg2MDgzNTksImp0aSI6IjQzYmVmOWFlMGRkZjQ5YjZhZGJlMmJjMmY1N2UzNTI0IiwidXNlcl9pZCI6IjcxODg1YmJlLTFmNDgtNDJiNi05MGU3LWY5ODhhZjUyMzFkZCJ9.AWfTeh2YIDsIOjWf4DANSZ1d8ITbPwEAvbTSdsxouudyXpVThTud_S-p0-E1XzxJ8vSUfL0q22U84xvwEcUOXa0MwEJGbRIpP16j4Q5ETULt8VEmPOkGf9RreKdRysgR07Yl2bXlAsYe6q2k5q6l04mOwNpp9RkoLB9FSavrLDrSQPv0-JJhcvMQpVrBq5yEn2YGfodDsSSb5cxx2COJpRw_XWdAhwXQpsecE3PV0bGr14-ggb85x5n6DZOO7YO9Hy4megcvAR-OT8wQKln8eTacs2hbPLGxjgdANAqaXMWus8A14ccgpvvJxxhk_ew5yU-BHTt-XxYfpkSDmykF9A",
+  "refresh": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc3ODY5NDc1OSwiaWF0IjoxNzc4NjA4MzU5LCJqdGkiOiIzZWE4YjU1MTdlYTU0NTNiOTdhMTg3YzJlZmI1YmQ5NCIsInVzZXJfaWQiOiI3MTg4NWJiZS0xZjQ4LTQyYjYtOTBlNy1mOTg4YWY1MjMxZGQifQ.l9M-Hdp_ZAxLTuoCeo7Wp2g-6n4Mm6x10xrcKJzgupX6xeDbABC7YpLDLPgV2XQLf_conC3s-wXQQkvwvXmwttvIW3SIPoQvfe3-jdrb_VH6DccUbPn-RsErHh-Sb95V6jTRzR8Od_HntMU-_Nq2ik3GyD3y3ZZE04ekJ4WDwy0U9562BYJUkmnFAsAwNtfnGEKtBObvL0j-ah10mCLUXcRwJEbpT_QmCxNvjic8t2kcpEA5QNbA-CX_PME1gNHAzZOcWU2D9hwsmVlWWDyawoEbFdqtZ4GCjh-B5B8s3yzuI-1gY8lwYmfq9YMmRIh8WxzsLKO4zyAmclJdg5rDCA"
+}
+ishimwe@alpha:~/projs/django/microservices/service_one/zedvye_six/chat_service$ curl -X POST http://127.0.0.1:8005/api/messages/with-image \
+  --cookie "access_token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzc4NjA4NjU5LCJpYXQiOjE3Nzg2MDgzNTksImp0aSI6IjQzYmVmOWFlMGRkZjQ5YjZhZGJlMmJjMmY1N2UzNTI0IiwidXNlcl9pZCI6IjcxODg1YmJlLTFmNDgtNDJiNi05MGU3LWY5ODhhZjUyMzFkZCJ9.AWfTeh2YIDsIOjWf4DANSZ1d8ITbPwEAvbTSdsxouudyXpVThTud_S-p0-E1XzxJ8vSUfL0q22U84xvwEcUOXa0MwEJGbRIpP16j4Q5ETULt8VEmPOkGf9RreKdRysgR07Yl2bXlAsYe6q2k5q6l04mOwNpp9RkoLB9FSavrLDrSQPv0-JJhcvMQpVrBq5yEn2YGfodDsSSb5cxx2COJpRw_XWdAhwXQpsecE3PV0bGr14-ggb85x5n6DZOO7YO9Hy4megcvAR-OT8wQKln8eTacs2hbPLGxjgdANAqaXMWus8A14ccgpvvJxxhk_ew5yU-BHTt-XxYfpkSDmykF9A" \
+  -F "room_id=ca9ee906-a23a-4e07-9cb5-08684cf3b21a" \
+  -F "content=Check out this design mockup for the new feature!" \
+  -F "image=@/home/ishimwe/projs/django/microservices/service_one/zedvye_six/chat_service/my_local_actions/pexels-marros-33143616.jpg" | jq
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100  861k    0   120  100  861k    366  2631k --:--:-- --:--:-- --:--:-- 2627k
+{
+  "timestamp": "2026-05-12T17:52:59.212Z",
+  "status": 415,
+  "error": "Unsupported Media Type",
+  "path": "/api/messages/with-image"
+}
+ishimwe@alpha:~/projs/django/microservices/service_one/zedvye_six/chat_service$ curl -X POST http://127.0.0.1:8005/api/messages/with-image \
+  --cookie "access_token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzc4NjA4NjU5LCJpYXQiOjE3Nzg2MDgzNTksImp0aSI6IjQzYmVmOWFlMGRkZjQ5YjZhZGJlMmJjMmY1N2UzNTI0IiwidXNlcl9pZCI6IjcxODg1YmJlLTFmNDgtNDJiNi05MGU3LWY5ODhhZjUyMzFkZCJ9.AWfTeh2YIDsIOjWf4DANSZ1d8ITbPwEAvbTSdsxouudyXpVThTud_S-p0-E1XzxJ8vSUfL0q22U84xvwEcUOXa0MwEJGbRIpP16j4Q5ETULt8VEmPOkGf9RreKdRysgR07Yl2bXlAsYe6q2k5q6l04mOwNpp9RkoLB9FSavrLDrSQPv0-JJhcvMQpVrBq5yEn2YGfodDsSSb5cxx2COJpRw_XWdAhwXQpsecE3PV0bGr14-ggb85x5n6DZOO7YO9Hy4megcvAR-OT8wQKln8eTacs2hbPLGxjgdANAqaXMWus8A14ccgpvvJxxhk_ew5yU-BHTt-XxYfpkSDmykF9A" \
+  -F "room_id=ca9ee906-a23a-4e07-9cb5-08684cf3b21a" \
+  -F "content=Check out this design mockup for the new feature!" \
+  -F "image=@/home/ishimwe/projs/django/microservices/service_one/zedvye_six/chat_service/my_local_actions/pexels-marros-33143616.jpg" | jq
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100  861k    0   120  100  861k   6109  42.8M --:--:-- --:--:-- --:--:-- 44.2M
+{
+  "timestamp": "2026-05-12T17:53:48.739Z",
+  "status": 415,
+  "error": "Unsupported Media Type",
+  "path": "/api/messages/with-image"
+}
+ishimwe@alpha:~/projs/django/microservices/service_one/zedvye_six/chat_service$ ) please comper (
+    // ─────────────────────────────────────────────────────────────────
+    // SEND MESSAGE WITH IMAGE
+    // ─────────────────────────────────────────────────────────────────
 
     /**
-     * Constructor injection — Spring will auto-wire all dependencies
-     * because they're annotated with @Component or @Service.
+     * Send a new message with an image attachment to a room.
      *
-     * @param roomCommandService handles persistence of RoomAggregate
-     * @param memberCommandService handles persistence of MemberAggregate (for group participants)
-     * @param userApiClient fetches user data from external Auth Service
-     * @param mediaStorageService handles local file storage for uploaded images
+     * <p><strong>Request format (multipart/form-data):</strong>
+     * <ul>
+     *   <li>{@code room_id}: UUID of the target room (form field)</li>
+     *   <li>{@code content}: Message text, 1-10000 chars, can be empty if image present (form field)</li>
+     *   <li>{@code image}: Image file to attach (file part, optional)</li>
+     * </ul>
+     * </p>
+     *
+     * <p><strong>Important:</strong> Image saving is handled by {@code MessageCommandHandler}
+     * via {@code LocalMediaStorageService.saveMessageImage()}. This controller only passes 
+     * the {@code MultipartFile} to the handler and converts the returned relative URL to 
+     * absolute for the response.</p>
      */
-    public RoomCommandHandler(
-            RoomCommandServiceInterface roomCommandService,
-            MemberCommandServiceInterface memberCommandService,
-            UserApiClient userApiClient,
-            LocalMediaStorageService mediaStorageService
+    @PostMapping(
+            path = "/with-image",
+            consumes = {"multipart/form-data"},
+            produces = {"application/json"}
+    )
+    public ResponseEntity<MessageCommandActionsResponse> sendMessageWithImage(
+            @RequestPart("room_id") UUID roomId,
+            @RequestPart(value = "content", required = false) String content,
+            @RequestPart(value = "image", required = false) MultipartFile image,
+            HttpServletRequest request
     ) {
-        this.roomCommandService = roomCommandService;
-        this.memberCommandService = memberCommandService;
-        this.userApiClient = userApiClient;
-        this.mediaStorageService = mediaStorageService;
+        UUID senderId = UserContext
+                .getUserIdAsUuid()
+                .orElseThrow(() -> {
+                    logger.error("Unauthorized: No authenticated user found in UserContext for sendMessageWithImage");
+                    return new RuntimeException("Unauthorized: No authenticated user found in context");
+                });
+
+        logger.info(
+                "Processing message with image send: room_id={}, sender_id={}, has_image={}",
+                roomId, senderId, image != null && !image.isEmpty()
+        );
+
+        MessageCommandActionsResponse response = messageCommandHandler.sendMessageWithImage(
+                roomId,
+                senderId,
+                content,
+                image
+        );
+
+        response = convertImageUrlsToAbsolute(response, request);
+
+        logger.info(
+                "Message with image successfully sent: message_id={}, room_id={}, has_image={}",
+                response.id(), response.roomId(), response.hasImage()
+        );
+
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(response);
+    }
+) with (@RestController
+@RequestMapping("/api/rooms")
+public class RoomCommandController {
+
+    private static final Logger logger = LoggerFactory.getLogger(RoomCommandController.class);
+
+    private final RoomCommandHandler roomCommandHandler;
+    private final MediaUrlService mediaUrlService;
+
+    /**
+     * Constructor injection — Spring will auto-wire dependencies
+     * because they're annotated with @Component or @Service.
+     */
+    public RoomCommandController(
+            RoomCommandHandler roomCommandHandler,
+            MediaUrlService mediaUrlService
+    ) {
+        this.roomCommandHandler = roomCommandHandler;
+        this.mediaUrlService = mediaUrlService;
     }
 
+    // ─────────────────────────────────────────────────────────────────
+    // GROUP ROOM CREATION (unchanged - working correctly)
+    // ─────────────────────────────────────────────────────────────────
+
+    @PostMapping(
+            path = "/groups",
+            consumes = {"multipart/form-data"}
+    )
+    public ResponseEntity<GroupCreationResponse> createGroupRoom(
+
+            @RequestPart("group_name")
+            String groupName,
+
+            @RequestPart(value = "description", required = false)
+            String description,
+
+            @RequestPart("participant_ids")
+            String participantIdsJson,
+
+            @RequestPart(value = "profile_image", required = false)
+            MultipartFile profileImage,
+
+            @RequestPart(value = "cover_image", required = false)
+            MultipartFile coverImage,
+
+            HttpServletRequest request
+
+    ) {
+        UUID creatorId = UserContext
+                .getUserIdAsUuid()
+                .orElseThrow(() -> {
+                    logger.error("Unauthorized: No authenticated user found in UserContext for createGroupRoom");
+                    return new RuntimeException("Unauthorized: No authenticated user found in context");
+                });
+
+        List<UUID> participantIds = parseUuidList(participantIdsJson);
+
+        logger.info(
+                "Processing GROUP room creation: creator_id={}, group_name='{}', participant_count={}",
+                creatorId, groupName, participantIds.size()
+        );
+
+        GroupCreationResponse response = roomCommandHandler.createGroupRoom(
+                creatorId,
+                groupName,
+                description,
+                participantIds,
+                profileImage,
+                coverImage
+        );
+
+        if (response.hasProfileImage() && response.profileImageUrl() != null) {
+            String absoluteProfileUrl = mediaUrlService.buildMediaUrl(request, response.profileImageUrl());
+            response = response.withProfileImageUrl(absoluteProfileUrl);
+            logger.debug("Converted profile image to absolute URL: {}", absoluteProfileUrl);
+        }
+
+        logger.info(
+                "GROUP room successfully created: room_id={}, group_name='{}'",
+                response.roomId(), response.name()
+        );
+
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(response);
+    }
+) and (
+    // ─────────────────────────────────────────────────────────────────
+    // SEND MESSAGE WITH IMAGE
+    // ─────────────────────────────────────────────────────────────────
+
+    /**
+     * Send a new message with an image attachment to a room.
+     *
+     * <p>Flow:
+     * <ol>
+     *   <li>Save uploaded image via LocalMediaStorageService → get relative path</li>
+     *   <li>Create MessageAggregate with image using domain factory</li>
+     *   <li>Persist message via messageCommandService</li>
+     *   <li>Update room last activity via roomCommandService</li>
+     *   <li>Increment unread count for all room members (excluding sender) via memberCommandService</li>
+     *   <li>Fetch sender username and profile image from Auth Service</li>
+     *   <li>Compose MessageCommandActionsResponse with enriched data</li>
+     * </ol>
+     * </p>
+     *
+     * <p><strong>Image URL note:</strong> The returned DTO contains RELATIVE image paths
+     * for both the message image and sender profile image. The controller layer should convert
+     * these to absolute URLs before sending the HTTP response.</p>
+     *
+     * @param roomId the room UUID where the message is sent
+     * @param senderId the authenticated user ID sending the message
+     * @param content the message text content (1-10000 chars, can be empty if image is present)
+     * @param image the image file to attach; can be null or empty
+     * @return MessageCommandActionsResponse ready for HTTP response (with relative image paths)
+     */
+    public MessageCommandActionsResponse sendMessageWithImage(
+            UUID roomId,
+            UUID senderId,
+            String content,
+            MultipartFile image
+    ) {
+        logger.info(
+                "Sending message with image: room_id={}, sender_id={}, has_image={}",
+                roomId, senderId, image != null && !image.isEmpty()
+        );
+
+        // ─────────────────────────────────────────────
+        // 1. Handle image upload (if provided)
+        //    - Convert MultipartFile → local file → RELATIVE URL path
+        // ─────────────────────────────────────────────
+        String relativeImageUrl = null;
+        if (image != null && !image.isEmpty()) {
+            relativeImageUrl = mediaStorageService.saveMessageImage(image);
+            logger.debug("Message image saved (relative path): {}", relativeImageUrl);
+        }
+
+        // ─────────────────────────────────────────────
+        // 2. Create message aggregate using domain factory
+        //    - Validation happens inside createNewWithImage()
+        // ─────────────────────────────────────────────
+        UUID messageId = UUID.randomUUID();
+        MessageAggregate messageAggregate = MessageAggregate.createNewWithImage(
+                messageId,
+                roomId,
+                senderId,
+                content,
+                relativeImageUrl
+        );
+
+        // ─────────────────────────────────────────────
+        // 3. Persist message via command service (transactional boundary)
+        // ─────────────────────────────────────────────
+        MessageAggregate savedMessage = messageCommandService.createMessageWithImage(messageAggregate);
+
+        // ─────────────────────────────────────────────
+        // 4. Update room last activity timestamp
+        // ─────────────────────────────────────────────
+        roomCommandService.updateLastActivity(roomId);
+        logger.debug("Updated last activity for room: room_id={}", roomId);
+
+        // ─────────────────────────────────────────────
+        // 5. Increment unread count for all room members (excluding sender)
+        // ─────────────────────────────────────────────
+        incrementUnreadForRoomMembers(roomId, senderId);
+
+        // ─────────────────────────────────────────────
+        // 6. Fetch sender data from Auth Service
+        // ─────────────────────────────────────────────
+        UserView sender = fetchUserView(senderId);
+        String senderUsername = sender.username();
+        String senderProfileImage = sender.profilePicture();
+
+        // ─────────────────────────────────────────────
+        // 7. Build enriched DTO for API response
+        // ─────────────────────────────────────────────
+        MessageCommandActionsResponse response = MessageCommandActionsResponse.fromMessage(
+                savedMessage,
+                senderUsername,
+                senderProfileImage,
+                null,  // No parent preview for non-reply messages
+                senderId
+        );
+
+        logger.info(
+                "Message with image successfully sent: message_id={}, room_id={}, has_image={}",
+                response.id(), response.roomId(), response.hasImage()
+        );
+
+        return response;
+    }) with (
     // ─────────────────────────────────────────────────────────────────
     // GROUP ROOM CREATION
     // ─────────────────────────────────────────────────────────────────
@@ -261,692 +464,369 @@ public class RoomCommandHandler {
         );
 
         return response;
-    }
+    }) you will get the solution  and we have (package com.example.chat_service.infrastructure.media;
 
-    // ─────────────────────────────────────────────────────────────────
-    // DIRECT ROOM CREATION (with bidirectional deduplication)
-    // ─────────────────────────────────────────────────────────────────
-
-    /**
-     * Create or retrieve a DIRECT message room between two users.
-     *
-     * <p>Flow:
-     * <ol>
-     *   <li>Check if DIRECT room already exists: first lookup (creatorId, friendId)</li>
-     *   <li>If not found: second lookup (friendId, creatorId) — bidirectional check</li>
-     *   <li>If either lookup finds a room: return existing room as PrivateRoomCreationResponse</li>
-     *   <li>If both lookups fail: create new DIRECT room aggregate</li>
-     *   <li>Persist room via roomCommandService</li>
-     *   <li>Create member records for both participants (both as USER status)</li>
-     *   <li>Fetch usernames from external Auth Service</li>
-     *   <li>Compose PrivateRoomCreationResponse with enriched member data</li>
-     * </ol>
-     * </p>
-     *
-     * <p><strong>Note:</strong> DIRECT rooms have no profile/cover images.
-     * Images are derived from participant profiles at query time.</p>
-     *
-     * <p><strong>Image URL note:</strong> The returned DTO has no image fields for DIRECT rooms.
-     * Frontend should fetch participant profile images separately via user service.</p>
-     *
-     * @param creatorId authenticated user ID initiating the conversation
-     * @param friendId the other participant's user ID
-     * @return PrivateRoomCreationResponse ready for HTTP response
-     */
-    public PrivateRoomCreationResponse createDirectRoom(
-            UUID creatorId,
-            UUID friendId
-    ) {
-        logger.info(
-                "Creating/retrieving DIRECT room: creator_id={}, friend_id={}",
-                creatorId, friendId
-        );
-
-        // ─────────────────────────────────────────────
-        // 1. Check if DIRECT room already exists (bidirectional deduplication)
-        //    - First lookup: (creatorId, friendId)
-        //    - Second lookup: (friendId, creatorId) — same conversation, reversed roles
-        //    - If either finds a room, return it to prevent duplicate conversations
-        // ─────────────────────────────────────────────
-        Optional<RoomAggregate> existingRoom = roomCommandService.loadByCreatorAndFriendId(creatorId, friendId);
-
-        // If first lookup failed, try reversed order (bidirectional check)
-        if (!existingRoom.isPresent()) {
-            existingRoom = roomCommandService.loadByCreatorAndFriendId(friendId, creatorId);
-        }
-
-        if (existingRoom.isPresent()) {
-            logger.debug(
-                    "Found existing DIRECT room: room_id={}, lookup_order=({},{})",
-                    existingRoom.get().id(), creatorId, friendId
-            );
-
-            // Fetch members and usernames for existing room response
-            List<MemberAggregate> members = memberCommandService.bulkLoadActiveByRoomId(existingRoom.get().id());
-            Map<UUID, String> userIdToUsername = fetchUsernamesForMembers(members);
-
-            // Use manual construction for DIRECT rooms since fromRoom() validates GROUP only
-            PrivateRoomCreationResponse response = buildDirectRoomResponse(
-                    existingRoom.get(),
-                    userIdToUsername,
-                    creatorId
-            );
-
-            logger.info(
-                    "Returned existing DIRECT room: room_id={}, member_count={}",
-                    response.roomId(), response.members().size()
-            );
-
-            return response;
-        }
-
-        // ─────────────────────────────────────────────
-        // 2. Create new DIRECT room aggregate
-        //    - Validation happens inside createNewDirect()
-        //    - DIRECT rooms have no images (null for profile/cover)
-        // ─────────────────────────────────────────────
-        UUID roomId = UUID.randomUUID();
-        RoomAggregate roomAggregate = RoomAggregate.createNewDirect(
-                roomId,
-                creatorId,
-                friendId
-        );
-
-        // ─────────────────────────────────────────────
-        // 3. Persist room via command service (transactional boundary)
-        // ─────────────────────────────────────────────
-        RoomAggregate savedRoom = roomCommandService.createDirectRoom(roomAggregate);
-
-        // ─────────────────────────────────────────────
-        // 4. Create member records for both participants
-        //    - Both get USER status in DIRECT rooms
-        //    - All operations happen within same transaction
-        // ─────────────────────────────────────────────
-        List<MemberAggregate> createdMembers = new ArrayList<>();
-
-        // Create creator as USER
-        MemberAggregate creatorMember = MemberAggregate.createNewAsUser(
-                UUID.randomUUID(),
-                creatorId,
-                savedRoom.id()
-        );
-        createdMembers.add(memberCommandService.createMember(creatorMember));
-
-        // Create friend as USER
-        MemberAggregate friendMember = MemberAggregate.createNewAsUser(
-                UUID.randomUUID(),
-                friendId,
-                savedRoom.id()
-        );
-        createdMembers.add(memberCommandService.createMember(friendMember));
-
-        logger.info(
-                "Created {} member records for DIRECT room: room_id={}",
-                createdMembers.size(),
-                savedRoom.id()
-        );
-
-        // ─────────────────────────────────────────────
-        // 5. Fetch usernames for both members from Auth Service
-        // ─────────────────────────────────────────────
-        Map<UUID, String> userIdToUsername = fetchUsernamesForMembers(createdMembers);
-
-        // ─────────────────────────────────────────────
-        // 6. Build enriched DTO for API response
-        //    - Manual construction for DIRECT rooms (fromRoom() only accepts GROUP)
-        //    - Sets is_group=false, name=null, no profile image
-        //    - Creator's username replaced with "You" for personalized UX
-        // ─────────────────────────────────────────────
-        PrivateRoomCreationResponse response = buildDirectRoomResponse(
-                savedRoom,
-                userIdToUsername,
-                creatorId
-        );
-
-        logger.info(
-                "DIRECT room successfully created: room_id={}, member_count={}",
-                response.roomId(), response.members().size()
-        );
-
-        return response;
-    }
-
-    // ─────────────────────────────────────────────────────────────────
-    // HELPER METHODS
-    // ─────────────────────────────────────────────────────────────────
-
-    /**
-     * Build a PrivateRoomCreationResponse for a DIRECT room.
-     *
-     * <p>Since {@code PrivateRoomCreationResponse.fromRoom()} only accepts GROUP rooms,
-     * this helper manually constructs the response with appropriate values for DIRECT rooms:
-     * <ul>
-     *   <li>{@code name} is null (DIRECT rooms have no group name)</li>
-     *   <li>{@code is_group} is false</li>
-     *   <li>{@code profileImageUrl} is null (DIRECT rooms have no images)</li>
-     *   <li>{@code hasProfileImage} is false</li>
-     * </ul>
-     * </p>
-     *
-     * @param room the DIRECT RoomAggregate
-     * @param userIdToUsername map of userId to username for members
-     * @param creatorId the authenticated user ID (for "You" substitution)
-     * @return PrivateRoomCreationResponse configured for a DIRECT room
-     */
-    private PrivateRoomCreationResponse buildDirectRoomResponse(
-            RoomAggregate room,
-            Map<UUID, String> userIdToUsername,
-            UUID creatorId
-    ) {
-        // Transform userId->username map to MemberPreview list, replacing creator's username with "You"
-        List<PrivateRoomCreationResponse.MemberPreview> previews = userIdToUsername.entrySet().stream()
-                .map(entry -> {
-                    String username = entry.getValue();
-                    String displayUsername = entry.getKey().equals(creatorId) ? "You" : username;
-                    return new PrivateRoomCreationResponse.MemberPreview(displayUsername);
-                })
-                .toList();
-
-        return new PrivateRoomCreationResponse(
-                room.id(),
-                null,                           // name is null for DIRECT rooms
-                null,                           // no profile image for DIRECT rooms
-                previews,
-                true,                           // admin - creator has admin context in response
-                false,                          // is_group = false for DIRECT rooms
-                false                           // hasProfileImage = false
-        );
-    }
-
-    /**
-     * Fetch usernames for a list of member aggregates from external Auth Service.
-     *
-     * @param members list of MemberAggregate to fetch usernames for
-     * @return map of userId -> username
-     */
-    private Map<UUID, String> fetchUsernamesForMembers(List<MemberAggregate> members) {
-        Map<UUID, String> userIdToUsername = new HashMap<>();
-        for (MemberAggregate member : members) {
-            try {
-                UserView user = userApiClient.getUserById(member.userId());
-                userIdToUsername.put(member.userId(), user.username());
-            } catch (Exception e) {
-                logger.warn(
-                        "Failed to fetch username for user_id={} (member_id={}): {}",
-                        member.userId(), member.id(), e.getMessage()
-                );
-                userIdToUsername.put(member.userId(), "Unknown");
-            }
-        }
-        return userIdToUsername;
-    }
-} only change that direct room creation function bacuse for group every thing is 100% fine) as you mentioned in (```java
-// chat_service/src/main/java/com/example/chat_service/application/rooms/handlers/dtos/PrivateRoomCreationResponse.java
-
-package com.example.chat_service.application.rooms.handlers.dtos;
-
-import com.example.chat_service.external.users.dtos.UserView;
-import com.fasterxml.jackson.annotation.JsonProperty;
-
-import java.util.List;
-import java.util.Map;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.UUID;
 
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+
 /**
- * DTO representing the response after successfully creating a PRIVATE (DIRECT) or GROUP room.
- * 
- * <p>Designed for immediate navigation to the newly created room view.
- * Contains only the essential display fields needed for the initial room render:
+ * Service for handling local file storage of media files.
+ *
+ * <p>Responsibilities:
  * <ul>
- *   <li>Room identity and metadata (id, name, profile image)</li>
- *   <li>Minimal member list (usernames only, with creator shown as "You")</li>
- *   <li>Context flags (admin, is_group)</li>
+ *   <li>Validate and sanitize uploaded files</li>
+ *   <li>Generate unique filenames to prevent collisions</li>
+ *   <li>Store files in configured local directory</li>
+ *   <li>Return public URL path for stored file</li>
  * </ul>
  * </p>
- * 
- * <p><strong>Design notes:</strong>
- * <ul>
- *   <li>For GROUP rooms: {@code is_group=true}, {@code name=groupName}, {@code profileImageUrl} from room</li>
- *   <li>For DIRECT rooms: {@code is_group=false}, {@code name=friendUsername}, {@code profileImageUrl=friendProfilePic}</li>
- *   <li>Member list contains only usernames to minimize payload size for initial load.</li>
- *   <li>The creator's username is replaced with "You" for personalized UX.</li>
- *   <li>All fields use {@code @JsonProperty} for consistent snake_case JSON output.</li>
- * </ul>
- * </p>
- * 
- * <p><strong>profileImageUrl field note:</strong> Initially contains RELATIVE path
- * from domain/DB (e.g. {@code /uploads/rooms/abc.jpg}). The controller
- * converts this to an absolute URL using {@link #withProfileImageUrl(String)}
- * before sending the HTTP response.</p>
- * 
- * <p>Usage example in service layer:
- * <pre>{@code
- *   // For GROUP room:
- *   RoomAggregate room = roomService.createGroup(...);
- *   List<MemberAggregate> members = memberService.findByRoomId(room.id());
- *   Map<UUID, UserView> userIdToUser = authClient.getUsers(
- *       members.stream().map(MemberAggregate::userId).toList()
- *   );
- *   PrivateRoomCreationResponse response = PrivateRoomCreationResponse.fromRoom(
- *       room, userIdToUser, room.creatorId()
- *   );
- *   
- *   // Convert relative → absolute URL for frontend
- *   response = response.withProfileImageUrl("http://127.0.0.1:8005/uploads/rooms/xyz.jpg");
- *   return ResponseEntity.ok(response);
- * }</pre>
- * </p>
+ *
+ * <p><strong>Security note:</strong> This implementation trusts the file extension
+ * from the original filename. In production, add MIME type validation, size limits,
+ * and extension whitelisting.</p>
  */
-public record PrivateRoomCreationResponse(
-
-        @JsonProperty("room_id")
-        UUID roomId,
-
-        @JsonProperty("name")
-        String name,
-
-        @JsonProperty("profile_image_url")
-        String profileImageUrl,
-
-        @JsonProperty("members")
-        List<MemberPreview> members,
-
-        @JsonProperty("admin")
-        boolean admin,
-
-        @JsonProperty("is_group")
-        boolean isGroup,
-
-        @JsonProperty("has_profile_image")
-        boolean hasProfileImage
-
-) {
+@Service
+public class LocalMediaStorageService {
 
     /**
-     * Minimal member representation for room creation response.
-     * Contains only the username for display purposes.
+     * Relative path where post images are stored.
+     * Resolved against application working directory.
      */
-    public record MemberPreview(
-            @JsonProperty("username")
-            String username
-    ) {}
+    private static final String POST_UPLOAD_DIR = "uploads/posts";
 
     /**
-     * Factory method to create a PrivateRoomCreationResponse from a RoomAggregate.
-     * 
-     * <p>Supports both GROUP and DIRECT room types:
-     * <ul>
-     *   <li><strong>GROUP rooms:</strong> uses {@code room.groupName()} for name,
-     *       {@code room.profileImageUrl()} for profile image, sets {@code is_group=true}</li>
-     *   <li><strong>DIRECT rooms:</strong> uses the OTHER participant's username for name,
-     *       their profile picture for profile image, sets {@code is_group=false}</li>
-     * </ul>
-     * 
-     * <p>Replaces the creator's username with "You" in the members list.
-     * The profileImageUrl is stored as a relative path from the domain;
-     * use {@link #withProfileImageUrl(String)} to convert to absolute URL.</p>
-     * 
-     * @param room the RoomAggregate containing room state
-     * @param userIdToUser map of userId to full UserView for all room members
-     * @param creatorId the UUID of the room creator (to replace with "You")
-     * @return PrivateRoomCreationResponse ready for API response
+     * Relative path where message images are stored.
      */
-    public static PrivateRoomCreationResponse fromRoom(
-            com.example.chat_service.domain.rooms.RoomAggregate room,
-            Map<UUID, UserView> userIdToUser,
-            UUID creatorId
-    ) {
-        String displayName = null;
-        String relativeImageUrl = null;
-        boolean isGroup = false;
-        
-        if (room.type() == com.example.chat_service.domain.rooms.Room.Type.GROUP) {
-            // GROUP room: use group name and room's profile image
-            displayName = room.groupName();
-            relativeImageUrl = room.profileImageUrl();
-            isGroup = true;
-        } else {
-            // DIRECT room: name = friend's username, profile image = friend's profile pic
-            // Find the friend's UserView (the one that's not the creator)
-            for (Map.Entry<UUID, UserView> entry : userIdToUser.entrySet()) {
-                if (!entry.getKey().equals(creatorId)) {
-                    UserView friendUser = entry.getValue();
-                    displayName = friendUser.username();              // Friend's username as room "name"
-                    relativeImageUrl = friendUser.profilePicture();   // Friend's profile image
-                    break;
-                }
+    private static final String MESSAGE_UPLOAD_DIR = "uploads/messages";
+
+    /**
+     * Relative path where group profile images are stored.
+     */
+    private static final String GROUP_PROFILE_UPLOAD_DIR = "uploads/groups/profile";
+
+    /**
+     * Relative path where group cover/background images are stored.
+     */
+    private static final String GROUP_COVER_UPLOAD_DIR = "uploads/groups/cover";
+
+    // ─────────────────────────────────────────────────────
+    // POST IMAGE METHODS (unchanged)
+    // ─────────────────────────────────────────────────────
+
+    /**
+     * Save an uploaded image file to local storage for posts.
+     *
+     * @param file the MultipartFile from the HTTP request
+     * @return the public URL path to access the saved image, e.g. "/uploads/posts/abc123.jpg"
+     * @throws RuntimeException if file saving fails
+     */
+    public String savePostImage(MultipartFile file) {
+
+        try {
+            // ─────────────────────────────────────────────
+            // 1. Ensure upload directory exists
+            // ─────────────────────────────────────────────
+            Path uploadPath = Paths.get(POST_UPLOAD_DIR);
+
+            if (!Files.exists(uploadPath)) {
+                Files.createDirectories(uploadPath);
             }
-            isGroup = false;
-        }
-        
-        // Transform userId->UserView map to MemberPreview list, replacing creator's username with "You"
-        List<MemberPreview> previews = userIdToUser.entrySet().stream()
-                .map(entry -> {
-                    String username = entry.getValue().username();
-                    String displayUsername = entry.getKey().equals(creatorId) ? "You" : username;
-                    return new MemberPreview(displayUsername);
-                })
-                .toList();
-        
-        return new PrivateRoomCreationResponse(
-                room.id(),
-                displayName,
-                relativeImageUrl,
-                previews,
-                true,   // admin - this response is always for the creator/admin context
-                isGroup,
-                relativeImageUrl != null && !relativeImageUrl.isBlank()
-        );
-    }
 
-    /**
-     * Convenience factory for testing or mock scenarios.
-     * 
-     * @param roomId the room UUID
-     * @param name the display name (group name or friend username)
-     * @param memberUsernames list of usernames to display (creator should already be "You" if desired)
-     * @param isGroup whether this is a group room
-     * @param profileImageUrl optional profile image URL (relative path)
-     * @return PrivateRoomCreationResponse for testing purposes
-     */
-    public static PrivateRoomCreationResponse forTesting(
-            UUID roomId,
-            String name,
-            List<String> memberUsernames,
-            boolean isGroup,
-            String profileImageUrl
-    ) {
-        return new PrivateRoomCreationResponse(
-                roomId,
-                name,
-                profileImageUrl,
-                memberUsernames.stream().map(MemberPreview::new).toList(),
-                true,   // admin
-                isGroup,
-                profileImageUrl != null && !profileImageUrl.isBlank()
-        );
-    }
+            // ─────────────────────────────────────────────
+            // 2. Generate unique, safe filename
+            // ─────────────────────────────────────────────
+            String originalName = file.getOriginalFilename();
+            String extension = "";
 
-    /**
-     * Create a new DTO instance with an updated profileImageUrl.
-     * 
-     * <p>Used to convert relative paths (from domain/DB) to absolute URLs
-     * (for frontend consumption) without modifying the original immutable record.</p>
-     * 
-     * <p><strong>Example:</strong>
-     * <pre>{@code
-     * // DTO from domain has: profileImageUrl = "/uploads/users/profile/abc.jpg"
-     * PrivateRoomCreationResponse response = PrivateRoomCreationResponse.fromRoom(room, userIdToUser, creatorId);
-     * 
-     * // Convert to absolute URL for API response
-     * response = response.withProfileImageUrl("http://127.0.0.1:8005/uploads/users/profile/abc.jpg");
-     * 
-     * // Response JSON now contains:
-     * // "profile_image_url": "http://127.0.0.1:8005/uploads/users/profile/abc.jpg",
-     * // "has_profile_image": true
-     * }</pre>
-     * </p>
-     * 
-     * @param newProfileImageUrl the absolute URL to use, or null to remove/clear image
-     * @return new PrivateRoomCreationResponse instance with updated profileImageUrl and recalculated hasProfileImage
-     */
-    public PrivateRoomCreationResponse withProfileImageUrl(String newProfileImageUrl) {
-        return new PrivateRoomCreationResponse(
-                this.roomId,
-                this.name,
-                newProfileImageUrl,
-                this.members,
-                this.admin,
-                this.isGroup,
-                // Recalculate hasProfileImage based on new value
-                newProfileImageUrl != null && !newProfileImageUrl.isBlank()
-        );
-    }
-}
-```
+            if (originalName != null && originalName.contains(".")) {
+                // Extract extension including the dot, e.g. ".jpg"
+                extension = originalName.substring(
+                        originalName.lastIndexOf(".")
+                ).toLowerCase();
+            }
 
----
+            // Use UUID to guarantee uniqueness + prevent path traversal
+            String filename = UUID.randomUUID() + extension;
 
-```java
-// In RoomCommandHandler.java - update the createDirectRoom method:
+            Path destination = uploadPath.resolve(filename);
 
-    // ─────────────────────────────────────────────────────────────────
-    // DIRECT ROOM CREATION (with bidirectional deduplication)
-    // ─────────────────────────────────────────────────────────────────
-
-    /**
-     * Create or retrieve a DIRECT message room between two users.
-     *
-     * <p>Flow:
-     * <ol>
-     *   <li>Check if DIRECT room already exists: first lookup (creatorId, friendId)</li>
-     *   <li>If not found: second lookup (friendId, creatorId) — bidirectional check</li>
-     *   <li>If either lookup finds a room: return existing room as PrivateRoomCreationResponse</li>
-     *   <li>If both lookups fail: create new DIRECT room aggregate</li>
-     *   <li>Persist room via roomCommandService</li>
-     *   <li>Create member records for both participants (both as USER status)</li>
-     *   <li>Fetch full UserView objects from external Auth Service (for name + profile image)</li>
-     *   <li>Compose PrivateRoomCreationResponse with enriched member data</li>
-     * </ol>
-     * </p>
-     *
-     * <p><strong>Note:</strong> DIRECT rooms have no profile/cover images stored on the room.
-     * Instead, the room displays the OTHER participant's profile picture and username
-     * (like WhatsApp/Instagram), fetched from the Auth Service.</p>
-     *
-     * <p><strong>Image URL note:</strong> The returned DTO contains a RELATIVE profile image path
-     * (from the friend's UserView). The controller layer should convert this to an absolute URL
-     * using {@code MediaUrlService.buildMediaUrl(HttpServletRequest, String)} before sending
-     * the HTTP response.</p>
-     *
-     * @param creatorId authenticated user ID initiating the conversation
-     * @param friendId the other participant's user ID
-     * @return PrivateRoomCreationResponse ready for HTTP response
-     */
-    public PrivateRoomCreationResponse createDirectRoom(
-            UUID creatorId,
-            UUID friendId
-    ) {
-        logger.info(
-                "Creating/retrieving DIRECT room: creator_id={}, friend_id={}",
-                creatorId, friendId
-        );
-
-        // ─────────────────────────────────────────────
-        // 1. Check if DIRECT room already exists (bidirectional deduplication)
-        //    - First lookup: (creatorId, friendId)
-        //    - Second lookup: (friendId, creatorId) — same conversation, reversed roles
-        //    - If either finds a room, return it to prevent duplicate conversations
-        // ─────────────────────────────────────────────
-        Optional<RoomAggregate> existingRoom = roomCommandService.loadAggregateByCreatorAndFriend(creatorId, friendId);
-
-        // If first lookup failed, try reversed order (bidirectional check)
-        if (!existingRoom.isPresent()) {
-            existingRoom = roomCommandService.loadAggregateByCreatorAndFriend(friendId, creatorId);
-        }
-
-        if (existingRoom.isPresent()) {
-            logger.debug(
-                    "Found existing DIRECT room: room_id={}, lookup_order=({},{})",
-                    existingRoom.get().id(), creatorId, friendId
+            // ─────────────────────────────────────────────
+            // 3. Save file to disk
+            // ─────────────────────────────────────────────
+            Files.copy(
+                    file.getInputStream(),
+                    destination,
+                    StandardCopyOption.REPLACE_EXISTING
             );
 
-            // Fetch members and full UserViews for existing room response
-            List<MemberAggregate> members = memberCommandService.bulkLoadActiveByRoomId(existingRoom.get().id());
-            Map<UUID, UserView> userIdToUser = fetchUserViewsForMembers(members);
+            // ─────────────────────────────────────────────
+            // 4. Return public URL path (relative to web root)
+            // ─────────────────────────────────────────────
+            return "/uploads/posts/" + filename;
 
-            PrivateRoomCreationResponse response = PrivateRoomCreationResponse.fromRoom(
-                    existingRoom.get(),
-                    userIdToUser,
-                    creatorId
+        } catch (IOException e) {
+            // Wrap checked exception in runtime exception for handler layer
+            throw new RuntimeException(
+                    "Failed to save image: " + file.getOriginalFilename(),
+                    e
             );
-
-            logger.info(
-                    "Returned existing DIRECT room: room_id={}, name='{}', has_image={}",
-                    response.roomId(), response.name(), response.hasProfileImage()
-            );
-
-            return response;
         }
-
-        // ─────────────────────────────────────────────
-        // 2. Create new DIRECT room aggregate
-        //    - Validation happens inside createNewDirect()
-        //    - DIRECT rooms have no images (null for profile/cover)
-        // ─────────────────────────────────────────────
-        UUID roomId = UUID.randomUUID();
-        RoomAggregate roomAggregate = RoomAggregate.createNewDirect(
-                roomId,
-                creatorId,
-                friendId
-        );
-
-        // ─────────────────────────────────────────────
-        // 3. Persist room via command service (transactional boundary)
-        // ─────────────────────────────────────────────
-        RoomAggregate savedRoom = roomCommandService.createDirectRoom(roomAggregate);
-
-        // ─────────────────────────────────────────────
-        // 4. Create member records for both participants
-        //    - Both get USER status in DIRECT rooms
-        //    - All operations happen within same transaction
-        // ─────────────────────────────────────────────
-        List<MemberAggregate> createdMembers = new ArrayList<>();
-
-        // Create creator as USER
-        MemberAggregate creatorMember = MemberAggregate.createNewAsUser(
-                UUID.randomUUID(),
-                creatorId,
-                savedRoom.id()
-        );
-        createdMembers.add(memberCommandService.createMember(creatorMember));
-
-        // Create friend as USER
-        MemberAggregate friendMember = MemberAggregate.createNewAsUser(
-                UUID.randomUUID(),
-                friendId,
-                savedRoom.id()
-        );
-        createdMembers.add(memberCommandService.createMember(friendMember));
-
-        logger.info(
-                "Created {} member records for DIRECT room: room_id={}",
-                createdMembers.size(),
-                savedRoom.id()
-        );
-
-        // ─────────────────────────────────────────────
-        // 5. Fetch FULL UserView objects (not just usernames) from Auth Service
-        //    - Needed for DIRECT rooms: friend's username = room name, friend's profile pic = room image
-        // ─────────────────────────────────────────────
-        Map<UUID, UserView> userIdToUser = fetchUserViewsForMembers(createdMembers);
-
-        // ─────────────────────────────────────────────
-        // 6. Build enriched DTO for API response
-        //    - For DIRECT rooms: name=friend's username, profile_image_url=friend's profile pic
-        //    - Creator's username replaced with "You" for personalized UX
-        // ─────────────────────────────────────────────
-        PrivateRoomCreationResponse response = PrivateRoomCreationResponse.fromRoom(
-                savedRoom,
-                userIdToUser,
-                creatorId
-        );
-
-        logger.info(
-                "DIRECT room successfully created: room_id={}, name='{}', has_image={}",
-                response.roomId(), response.name(), response.hasProfileImage()
-        );
-
-        return response;
-    }
-
-    // ─────────────────────────────────────────────────────────────────
-    // HELPER METHODS
-    // ─────────────────────────────────────────────────────────────────
-
-    /**
-     * Fetch full UserView objects for a list of member aggregates from external Auth Service.
-     *
-     * <p>Used for DIRECT rooms where we need the friend's profile picture for the room display.</p>
-     *
-     * @param members list of MemberAggregate to fetch UserViews for
-     * @return map of userId -> UserView (with username, profilePicture, etc.)
-     */
-    private Map<UUID, UserView> fetchUserViewsForMembers(List<MemberAggregate> members) {
-        Map<UUID, UserView> userIdToUser = new HashMap<>();
-        for (MemberAggregate member : members) {
-            try {
-                UserView user = userApiClient.getUserById(member.userId());
-                userIdToUser.put(member.userId(), user);
-            } catch (Exception e) {
-                logger.warn(
-                        "Failed to fetch UserView for user_id={} (member_id={}): {}",
-                        member.userId(), member.id(), e.getMessage()
-                );
-                // Fallback: create minimal UserView with just username
-                UserView fallback = new UserView(
-                        member.userId(),
-                        "user_" + member.userId().toString().substring(0, 8),
-                        null, null, null, null
-                );
-                userIdToUser.put(member.userId(), fallback);
-            }
-        }
-        return userIdToUser;
     }
 
     /**
-     * Fetch usernames for a list of member aggregates from external Auth Service.
-     * (Legacy helper kept for GROUP room creation which only needs usernames)
+     * Delete a previously saved post image by its public path.
      *
-     * @param members list of MemberAggregate to fetch usernames for
-     * @return map of userId -> username
+     * @param publicPath the path returned by savePostImage(), e.g. "/uploads/posts/abc.jpg"
+     * @return true if file was deleted, false if not found
      */
-    private Map<UUID, String> fetchUsernamesForMembers(List<MemberAggregate> members) {
-        Map<UUID, String> userIdToUsername = new HashMap<>();
-        for (MemberAggregate member : members) {
-            try {
-                UserView user = userApiClient.getUserById(member.userId());
-                userIdToUsername.put(member.userId(), user.username());
-            } catch (Exception e) {
-                logger.warn(
-                        "Failed to fetch username for user_id={} (member_id={}): {}",
-                        member.userId(), member.id(), e.getMessage()
-                );
-                userIdToUsername.put(member.userId(), "Unknown");
+    public boolean deletePostImage(String publicPath) {
+        try {
+            // Remove leading slash and convert to filesystem path
+            String relativePath = publicPath.replaceFirst("^/", "");
+            Path filePath = Paths.get(relativePath);
+
+            if (Files.exists(filePath)) {
+                return Files.deleteIfExists(filePath);
             }
+            return false;
+        } catch (IOException e) {
+            throw new RuntimeException(
+                    "Failed to delete image: " + publicPath,
+                    e
+            );
         }
-        return userIdToUsername;
     }
-```
 
----
+    // ─────────────────────────────────────────────────────
+    // MESSAGE IMAGE METHODS (new)
+    // ─────────────────────────────────────────────────────
 
-## Expected Response After Fix
+    /**
+     * Save an uploaded image file to local storage for messages.
+     *
+     * @param file the MultipartFile from the HTTP request
+     * @return the public URL path to access the saved image, e.g. "/uploads/messages/abc123.jpg"
+     * @throws RuntimeException if file saving fails
+     */
+    public String saveMessageImage(MultipartFile file) {
 
-```json
-{
-  "room_id": "a036fffd-0ceb-42f9-ba67-5de2335c42a2",
-  "name": "testuser9",
-  "profile_image_url": "/media/profile_pictures/pexels-budget-bizar-92378004-18879101.jpg",
-  "members": [
-    {"username": "You"},
-    {"username": "testuser9"}
-  ],
-  "admin": true,
-  "is_group": false,
-  "has_profile_image": true
-}
-```
+        try {
+            // ─────────────────────────────────────────────
+            // 1. Ensure upload directory exists
+            // ─────────────────────────────────────────────
+            Path uploadPath = Paths.get(MESSAGE_UPLOAD_DIR);
 
-### Key Changes Summary
+            if (!Files.exists(uploadPath)) {
+                Files.createDirectories(uploadPath);
+            }
 
-| Change | Description |
-|--------|-------------|
-| **DTO parameter** | `fromRoom()` now accepts `Map<UUID, UserView>` instead of `Map<UUID, String>` to get full user data |
-| **DIRECT room name** | Now set to friend's username (`friendUser.username()`) instead of `null` |
-| **DIRECT room image** | Now set to friend's profile picture (`friendUser.profilePicture()`) instead of `null` |
-| **Handler logic** | `createDirectRoom()` now calls `fetchUserViewsForMembers()` to get full UserView objects |
-| **Fallback handling** | If Auth Service call fails, creates minimal UserView with placeholder username |
+            // ─────────────────────────────────────────────
+            // 2. Generate unique, safe filename
+            // ─────────────────────────────────────────────
+            String originalName = file.getOriginalFilename();
+            String extension = "";
 
-> **Note:** The controller layer should still convert the relative `profile_image_url` to an absolute URL using `MediaUrlService.buildMediaUrl(HttpServletRequest, String)` before sending the HTTP response.)
+            if (originalName != null && originalName.contains(".")) {
+                // Extract extension including the dot, e.g. ".jpg"
+                extension = originalName.substring(
+                        originalName.lastIndexOf(".")
+                ).toLowerCase();
+            }
+
+            // Use UUID to guarantee uniqueness + prevent path traversal
+            String filename = UUID.randomUUID() + extension;
+
+            Path destination = uploadPath.resolve(filename);
+
+            // ─────────────────────────────────────────────
+            // 3. Save file to disk
+            // ─────────────────────────────────────────────
+            Files.copy(
+                    file.getInputStream(),
+                    destination,
+                    StandardCopyOption.REPLACE_EXISTING
+            );
+
+            // ─────────────────────────────────────────────
+            // 4. Return public URL path (relative to web root)
+            // ─────────────────────────────────────────────
+            return "/uploads/messages/" + filename;
+
+        } catch (IOException e) {
+            // Wrap checked exception in runtime exception for handler layer
+            throw new RuntimeException(
+                    "Failed to save image: " + file.getOriginalFilename(),
+                    e
+            );
+        }
+    }
+
+    /**
+     * Delete a previously saved message image by its public path.
+     *
+     * @param publicPath the path returned by saveMessageImage(), e.g. "/uploads/messages/abc.jpg"
+     * @return true if file was deleted, false if not found
+     */
+    public boolean deleteMessageImage(String publicPath) {
+        try {
+            // Remove leading slash and convert to filesystem path
+            String relativePath = publicPath.replaceFirst("^/", "");
+            Path filePath = Paths.get(relativePath);
+
+            if (Files.exists(filePath)) {
+                return Files.deleteIfExists(filePath);
+            }
+            return false;
+        } catch (IOException e) {
+            throw new RuntimeException(
+                    "Failed to delete image: " + publicPath,
+                    e
+            );
+        }
+    }
+
+    // ─────────────────────────────────────────────────────
+    // GROUP PROFILE IMAGE METHODS (new)
+    // ─────────────────────────────────────────────────────
+
+    /**
+     * Save an uploaded group profile image file to local storage.
+     *
+     * @param file the MultipartFile from the HTTP request
+     * @return the public URL path to access the saved image, e.g. "/uploads/groups/profile/abc123.jpg"
+     * @throws RuntimeException if file saving fails
+     */
+    public String saveGroupProfileImage(MultipartFile file) {
+        return saveImageToDirectory(file, GROUP_PROFILE_UPLOAD_DIR, "/uploads/groups/profile/");
+    }
+
+    /**
+     * Delete a previously saved group profile image by its public path.
+     *
+     * @param publicPath the path returned by saveGroupProfileImage(), e.g. "/uploads/groups/profile/abc.jpg"
+     * @return true if file was deleted, false if not found
+     */
+    public boolean deleteGroupProfileImage(String publicPath) {
+        return deleteImageFromPath(publicPath);
+    }
+
+    // ─────────────────────────────────────────────────────
+    // GROUP COVER/BACKGROUND IMAGE METHODS (new)
+    // ─────────────────────────────────────────────────────
+
+    /**
+     * Save an uploaded group cover/background image file to local storage.
+     *
+     * @param file the MultipartFile from the HTTP request
+     * @return the public URL path to access the saved image, e.g. "/uploads/groups/cover/abc123.jpg"
+     * @throws RuntimeException if file saving fails
+     */
+    public String saveGroupCoverImage(MultipartFile file) {
+        return saveImageToDirectory(file, GROUP_COVER_UPLOAD_DIR, "/uploads/groups/cover/");
+    }
+
+    /**
+     * Delete a previously saved group cover/background image by its public path.
+     *
+     * @param publicPath the path returned by saveGroupCoverImage(), e.g. "/uploads/groups/cover/abc.jpg"
+     * @return true if file was deleted, false if not found
+     */
+    public boolean deleteGroupCoverImage(String publicPath) {
+        return deleteImageFromPath(publicPath);
+    }
+
+    // ─────────────────────────────────────────────────────
+    // INTERNAL HELPER METHODS
+    // ─────────────────────────────────────────────────────
+
+    /**
+     * Internal helper to save an image to a specific directory.
+     *
+     * @param file the MultipartFile to save
+     * @param uploadDir the filesystem directory path
+     * @param publicPrefix the public URL prefix to return
+     * @return the public URL path for the saved image
+     */
+    private String saveImageToDirectory(MultipartFile file, String uploadDir, String publicPrefix) {
+        try {
+            // ─────────────────────────────────────────────
+            // 1. Ensure upload directory exists
+            // ─────────────────────────────────────────────
+            Path uploadPath = Paths.get(uploadDir);
+
+            if (!Files.exists(uploadPath)) {
+                Files.createDirectories(uploadPath);
+            }
+
+            // ─────────────────────────────────────────────
+            // 2. Generate unique, safe filename
+            // ─────────────────────────────────────────────
+            String originalName = file.getOriginalFilename();
+            String extension = "";
+
+            if (originalName != null && originalName.contains(".")) {
+                // Extract extension including the dot, e.g. ".jpg"
+                extension = originalName.substring(
+                        originalName.lastIndexOf(".")
+                ).toLowerCase();
+            }
+
+            // Use UUID to guarantee uniqueness + prevent path traversal
+            String filename = UUID.randomUUID() + extension;
+
+            Path destination = uploadPath.resolve(filename);
+
+            // ─────────────────────────────────────────────
+            // 3. Save file to disk
+            // ─────────────────────────────────────────────
+            Files.copy(
+                    file.getInputStream(),
+                    destination,
+                    StandardCopyOption.REPLACE_EXISTING
+            );
+
+            // ─────────────────────────────────────────────
+            // 4. Return public URL path (relative to web root)
+            // ─────────────────────────────────────────────
+            return publicPrefix + filename;
+
+        } catch (IOException e) {
+            // Wrap checked exception in runtime exception for handler layer
+            throw new RuntimeException(
+                    "Failed to save image: " + file.getOriginalFilename(),
+                    e
+            );
+        }
+    }
+
+    /**
+     * Internal helper to delete an image by its public path.
+     *
+     * @param publicPath the public URL path to delete
+     * @return true if file was deleted, false if not found
+     */
+    private boolean deleteImageFromPath(String publicPath) {
+        try {
+            // Remove leading slash and convert to filesystem path
+            String relativePath = publicPath.replaceFirst("^/", "");
+            Path filePath = Paths.get(relativePath);
+
+            if (Files.exists(filePath)) {
+                return Files.deleteIfExists(filePath);
+            }
+            return false;
+        } catch (IOException e) {
+            throw new RuntimeException(
+                    "Failed to delete image: " + publicPath,
+                    e
+            );
+        }
+    }
+})

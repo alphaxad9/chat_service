@@ -503,6 +503,206 @@ public class MessageCommandHandler {
     }
 
     // ─────────────────────────────────────────────────────────────────
+    // MESSAGE UPDATE ACTIONS (return MessageCommandActionsResponse)
+    // ─────────────────────────────────────────────────────────────────
+
+    /**
+     * Delete a message and return the response DTO.
+     *
+     * @param messageId the UUID of the message to delete
+     * @param actorId the UUID of the user requesting deletion (must be sender)
+     * @return MessageCommandActionsResponse with is_deleted=true
+     */
+    public MessageCommandActionsResponse deleteMessage(UUID messageId, UUID actorId) {
+        logger.info("Deleting message: message_id={}, actor_id={}", messageId, actorId);
+
+        MessageAggregate savedMessage = messageCommandService.deleteMessage(messageId, actorId);
+
+        // Fetch sender data for response
+        UserView sender = fetchUserView(savedMessage.message().senderId());
+        String senderUsername = sender.username();
+        String senderProfileImage = sender.profilePicture();
+
+        // Build parent preview if this was a reply
+        MessageCommandActionsResponse.ParentPreview parentPreview = null;
+        if (savedMessage.message().isReply() && savedMessage.message().parentId() != null) {
+            parentPreview = buildParentPreview(savedMessage.message().parentId());
+        }
+
+        MessageCommandActionsResponse response = MessageCommandActionsResponse.fromMessage(
+                savedMessage,
+                senderUsername,
+                senderProfileImage,
+                parentPreview,
+                actorId  // requesterId = actorId for is_mine calculation
+        );
+
+        logger.info("Message deleted: message_id={}, is_deleted={}", messageId, response.isDeleted());
+        return response;
+    }
+
+    /**
+     * Mark a message as RECEIVED and return the response DTO.
+     *
+     * @param messageId the UUID of the message to mark
+     * @param actorId the UUID of the user marking as received (must be receiver, not sender)
+     * @return MessageCommandActionsResponse with updated status
+     */
+    public MessageCommandActionsResponse markAsReceived(UUID messageId, UUID actorId) {
+        logger.info("Marking message as RECEIVED: message_id={}, actor_id={}", messageId, actorId);
+
+        MessageAggregate savedMessage = messageCommandService.markAsReceived(messageId, actorId);
+
+        // Fetch sender data for response
+        UserView sender = fetchUserView(savedMessage.message().senderId());
+        String senderUsername = sender.username();
+        String senderProfileImage = sender.profilePicture();
+
+        // Build parent preview if this was a reply
+        MessageCommandActionsResponse.ParentPreview parentPreview = null;
+        if (savedMessage.message().isReply() && savedMessage.message().parentId() != null) {
+            parentPreview = buildParentPreview(savedMessage.message().parentId());
+        }
+
+        MessageCommandActionsResponse response = MessageCommandActionsResponse.fromMessage(
+                savedMessage,
+                senderUsername,
+                senderProfileImage,
+                parentPreview,
+                actorId  // requesterId = actorId for is_mine calculation
+        );
+
+        logger.info("Message marked as RECEIVED: message_id={}, status={}", messageId, response.status());
+        return response;
+    }
+
+    /**
+     * Mark a message as SEEN and return the response DTO.
+     *
+     * @param messageId the UUID of the message to mark
+     * @param actorId the UUID of the user marking as seen (must be receiver, not sender)
+     * @return MessageCommandActionsResponse with updated status and seen_at
+     */
+    public MessageCommandActionsResponse markAsSeen(UUID messageId, UUID actorId) {
+        logger.info("Marking message as SEEN: message_id={}, actor_id={}", messageId, actorId);
+
+        MessageAggregate savedMessage = messageCommandService.markAsSeen(messageId, actorId);
+
+        // Fetch sender data for response
+        UserView sender = fetchUserView(savedMessage.message().senderId());
+        String senderUsername = sender.username();
+        String senderProfileImage = sender.profilePicture();
+
+        // Build parent preview if this was a reply
+        MessageCommandActionsResponse.ParentPreview parentPreview = null;
+        if (savedMessage.message().isReply() && savedMessage.message().parentId() != null) {
+            parentPreview = buildParentPreview(savedMessage.message().parentId());
+        }
+
+        MessageCommandActionsResponse response = MessageCommandActionsResponse.fromMessage(
+                savedMessage,
+                senderUsername,
+                senderProfileImage,
+                parentPreview,
+                actorId  // requesterId = actorId for is_mine calculation
+        );
+
+        logger.info("Message marked as SEEN: message_id={}, status={}, seen_at={}", 
+                messageId, response.status(), savedMessage.message().seenAt());
+        return response;
+    }
+
+    /**
+     * Update message content and return the response DTO.
+     *
+     * @param messageId the UUID of the message to update
+     * @param newContent the new message text (1-10000 chars)
+     * @param actorId the UUID of the user performing the update (must be sender)
+     * @return MessageCommandActionsResponse with updated content
+     */
+    public MessageCommandActionsResponse updateContent(UUID messageId, String newContent, UUID actorId) {
+        logger.info("Updating message content: message_id={}, actor_id={}, content_length={}", 
+                messageId, actorId, newContent != null ? newContent.length() : 0);
+
+        MessageAggregate savedMessage = messageCommandService.updateContent(messageId, newContent, actorId);
+
+        // Fetch sender data for response
+        UserView sender = fetchUserView(savedMessage.message().senderId());
+        String senderUsername = sender.username();
+        String senderProfileImage = sender.profilePicture();
+
+        // Build parent preview if this was a reply
+        MessageCommandActionsResponse.ParentPreview parentPreview = null;
+        if (savedMessage.message().isReply() && savedMessage.message().parentId() != null) {
+            parentPreview = buildParentPreview(savedMessage.message().parentId());
+        }
+
+        MessageCommandActionsResponse response = MessageCommandActionsResponse.fromMessage(
+                savedMessage,
+                senderUsername,
+                senderProfileImage,
+                parentPreview,
+                actorId  // requesterId = actorId for is_mine calculation
+        );
+
+        logger.info("Message content updated: message_id={}, content_length={}", 
+                messageId, response.content().length());
+        return response;
+    }
+
+    /**
+     * Update message image and return the response DTO.
+     *
+     * @param messageId the UUID of the message to update
+     * @param image the new image file (optional, multipart)
+     * @param actorId the UUID of the user performing the update (must be sender)
+     * @return MessageCommandActionsResponse with updated image_url
+     */
+    public MessageCommandActionsResponse updateImage(UUID messageId, MultipartFile image, UUID actorId) {
+        logger.info("Updating message image: message_id={}, actor_id={}, has_image={}", 
+                messageId, actorId, image != null && !image.isEmpty());
+
+        // ─────────────────────────────────────────────
+        // Handle image upload or removal
+        // - If image provided: save via LocalMediaStorageService → get relative path
+        // - If image is null/empty: pass null to domain to keep existing or clear
+        // ─────────────────────────────────────────────
+        String newImageUrl = null;
+
+        if (image != null && !image.isEmpty()) {
+            // Save new image and get relative path
+            newImageUrl = mediaStorageService.saveMessageImage(image);
+            logger.debug("Message image saved (relative path): {}", newImageUrl);
+        }
+        // else: no image provided → pass null, domain handles as "no change" or "clear"
+
+        MessageAggregate savedMessage = messageCommandService.updateImage(messageId, newImageUrl, actorId);
+
+        // Fetch sender data for response
+        UserView sender = fetchUserView(savedMessage.message().senderId());
+        String senderUsername = sender.username();
+        String senderProfileImage = sender.profilePicture();
+
+        // Build parent preview if this was a reply
+        MessageCommandActionsResponse.ParentPreview parentPreview = null;
+        if (savedMessage.message().isReply() && savedMessage.message().parentId() != null) {
+            parentPreview = buildParentPreview(savedMessage.message().parentId());
+        }
+
+        MessageCommandActionsResponse response = MessageCommandActionsResponse.fromMessage(
+                savedMessage,
+                senderUsername,
+                senderProfileImage,
+                parentPreview,
+                actorId  // requesterId = actorId for is_mine calculation
+        );
+
+        logger.info("Message image updated: message_id={}, has_image={}", 
+                messageId, response.hasImage());
+        return response;
+    }
+
+    // ─────────────────────────────────────────────────────────────────
     // HELPER METHODS
     // ─────────────────────────────────────────────────────────────────
 
