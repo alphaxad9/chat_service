@@ -7,7 +7,6 @@ import java.util.UUID;
 
 // ← Imports for exceptions in sub-package
 import com.example.chat_service.domain.members.exceptions.InvalidMemberEntityError;
-import com.example.chat_service.domain.members.exceptions.InvalidMemberStatusError;
 import com.example.chat_service.domain.members.exceptions.InvalidUnreadMessagesError;
 import com.example.chat_service.domain.members.exceptions.MemberOperationNotAllowedError;
 import com.example.chat_service.domain.members.exceptions.MemberStateTransitionError;
@@ -68,7 +67,6 @@ public final class MemberAggregate {
         }
 
         // Use provided timestamp or default to now
-        LocalDateTime timestamp = joinedAt != null ? joinedAt : LocalDateTime.now();
         
         Member newMember = Member.create(id, userId, roomId, initialStatus);
         // Note: Member.create() uses LocalDateTime.now() internally.
