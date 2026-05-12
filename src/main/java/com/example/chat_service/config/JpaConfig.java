@@ -24,7 +24,8 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
     basePackages = {
         "com.example.chat_service.infrastructure.persistence.posts.jpa",
         "com.example.chat_service.infrastructure.persistence.member.jpa",
-        "com.example.chat_service.infrastructure.persistence.rooms.jpa"
+        "com.example.chat_service.infrastructure.persistence.rooms.jpa",
+        "com.example.chat_service.infrastructure.persistence.messages.jpa"
     },
     entityManagerFactoryRef = "entityManagerFactory",
     transactionManagerRef = "transactionManager"
