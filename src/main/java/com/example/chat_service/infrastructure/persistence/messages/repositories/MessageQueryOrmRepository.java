@@ -80,16 +80,16 @@ public class MessageQueryOrmRepository implements MessageQueryRepository {
             return Collections.emptyMap();
         }
         
-        // Fetch latest active message per room using pure ORM derivation
+        // Fetch latest active message per room using native DISTINCT ON query
         List<MessageEntity> entities = messageQueryJpaRepository
-            .findFirstByRoomIdInAndIsDeletedFalseOrderByRoomIdCreatedAtDesc(roomIds);
+            .findLatestActiveByRoomIds(roomIds);
         
         // Group by roomId and keep only the latest message per room
         return entities.stream()
             .collect(Collectors.toMap(
                 MessageEntity::getRoomId,
                 MessageMapper::entityToDomain,
-                // If duplicate roomIds exist (shouldn't with ORDER BY), keep first
+                // If duplicate roomIds exist (shouldn't with DISTINCT ON), keep first
                 (existing, replacement) -> existing
             ));
     }
@@ -100,9 +100,9 @@ public class MessageQueryOrmRepository implements MessageQueryRepository {
             return Collections.emptyMap();
         }
         
-        // Fetch latest active message per room
+        // Fetch latest active message per room using native DISTINCT ON query
         List<MessageEntity> entities = messageQueryJpaRepository
-            .findFirstByRoomIdInAndIsDeletedFalseOrderByRoomIdCreatedAtDesc(roomIds);
+            .findLatestActiveByRoomIds(roomIds);
         
         // Project to MessageSummary and group by roomId
         return entities.stream()

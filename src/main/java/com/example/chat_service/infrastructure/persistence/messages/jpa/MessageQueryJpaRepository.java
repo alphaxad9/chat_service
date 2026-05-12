@@ -7,6 +7,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.example.chat_service.infrastructure.persistence.messages.MessageEntity;
@@ -24,6 +26,10 @@ import com.example.chat_service.infrastructure.persistence.messages.MessageEntit
  *
  * <p><strong>Pure ORM derivation:</strong> All queries use Spring Data JPA's method-name
  * derivation. No JPQL/SQL strings — type-safe, refactor-friendly, and IDE-autocompleted.</p>
+ *
+ * <p><strong>Exception:</strong> {@code findLatestActiveByRoomIds} uses a native PostgreSQL
+ * {@code DISTINCT ON} query because method-name derivation cannot express "latest per group"
+ * semantics. This is the most efficient approach for PostgreSQL.</p>
  *
  * <p><strong>Not for write operations:</strong> This repository is read-only. For command
  * operations (save, update, delete), use {@code MessageCommandJpaRepository}.</p>
@@ -52,10 +58,25 @@ public interface MessageQueryJpaRepository extends JpaRepository<MessageEntity, 
     Optional<MessageEntity> findTopByRoomIdAndIsDeletedFalseOrderByCreatedAtDesc(UUID roomId);
 
     /**
-     * Find the most recent active messages for multiple rooms.
-     * Returns one message per room (the latest), ordered by room then createdAt desc.
+     * Find the most recent active message for each room in the collection.
+     * Returns at most one message per room (the latest by createdAt).
+     * 
+     * <p><strong>PostgreSQL optimization:</strong> Uses {@code DISTINCT ON (room_id)}
+     * which is the most efficient way to get "latest per group" in PostgreSQL.
+     * The {@code ORDER BY room_id, created_at DESC} ensures the first row per room
+     * is the most recent message.</p>
+     * 
+     * @param roomIds collection of room UUIDs to query
+     * @return list of latest active messages, at most one per room
      */
-    List<MessageEntity> findFirstByRoomIdInAndIsDeletedFalseOrderByRoomIdCreatedAtDesc(Collection<UUID> roomIds);
+    @Query(value = """
+            SELECT DISTINCT ON (room_id) *
+            FROM messages
+            WHERE room_id IN :roomIds
+              AND is_deleted = false
+            ORDER BY room_id, created_at DESC
+            """, nativeQuery = true)
+    List<MessageEntity> findLatestActiveByRoomIds(@Param("roomIds") Collection<UUID> roomIds);
 
     // ── Bulk Queries by Room (Active Messages Only) ───────────────────
 

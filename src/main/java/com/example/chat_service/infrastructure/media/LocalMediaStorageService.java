@@ -36,6 +36,11 @@ public class LocalMediaStorageService {
     private static final String POST_UPLOAD_DIR = "uploads/posts";
 
     /**
+     * Relative path where message images are stored.
+     */
+    private static final String MESSAGE_UPLOAD_DIR = "uploads/messages";
+
+    /**
      * Relative path where group profile images are stored.
      */
     private static final String GROUP_PROFILE_UPLOAD_DIR = "uploads/groups/profile";
@@ -116,6 +121,94 @@ public class LocalMediaStorageService {
      * @return true if file was deleted, false if not found
      */
     public boolean deletePostImage(String publicPath) {
+        try {
+            // Remove leading slash and convert to filesystem path
+            String relativePath = publicPath.replaceFirst("^/", "");
+            Path filePath = Paths.get(relativePath);
+
+            if (Files.exists(filePath)) {
+                return Files.deleteIfExists(filePath);
+            }
+            return false;
+        } catch (IOException e) {
+            throw new RuntimeException(
+                    "Failed to delete image: " + publicPath,
+                    e
+            );
+        }
+    }
+
+    // ─────────────────────────────────────────────────────
+    // MESSAGE IMAGE METHODS (new)
+    // ─────────────────────────────────────────────────────
+
+    /**
+     * Save an uploaded image file to local storage for messages.
+     *
+     * @param file the MultipartFile from the HTTP request
+     * @return the public URL path to access the saved image, e.g. "/uploads/messages/abc123.jpg"
+     * @throws RuntimeException if file saving fails
+     */
+    public String saveMessageImage(MultipartFile file) {
+
+        try {
+            // ─────────────────────────────────────────────
+            // 1. Ensure upload directory exists
+            // ─────────────────────────────────────────────
+            Path uploadPath = Paths.get(MESSAGE_UPLOAD_DIR);
+
+            if (!Files.exists(uploadPath)) {
+                Files.createDirectories(uploadPath);
+            }
+
+            // ─────────────────────────────────────────────
+            // 2. Generate unique, safe filename
+            // ─────────────────────────────────────────────
+            String originalName = file.getOriginalFilename();
+            String extension = "";
+
+            if (originalName != null && originalName.contains(".")) {
+                // Extract extension including the dot, e.g. ".jpg"
+                extension = originalName.substring(
+                        originalName.lastIndexOf(".")
+                ).toLowerCase();
+            }
+
+            // Use UUID to guarantee uniqueness + prevent path traversal
+            String filename = UUID.randomUUID() + extension;
+
+            Path destination = uploadPath.resolve(filename);
+
+            // ─────────────────────────────────────────────
+            // 3. Save file to disk
+            // ─────────────────────────────────────────────
+            Files.copy(
+                    file.getInputStream(),
+                    destination,
+                    StandardCopyOption.REPLACE_EXISTING
+            );
+
+            // ─────────────────────────────────────────────
+            // 4. Return public URL path (relative to web root)
+            // ─────────────────────────────────────────────
+            return "/uploads/messages/" + filename;
+
+        } catch (IOException e) {
+            // Wrap checked exception in runtime exception for handler layer
+            throw new RuntimeException(
+                    "Failed to save image: " + file.getOriginalFilename(),
+                    e
+            );
+        }
+    }
+
+    /**
+     * Delete a previously saved message image by its public path.
+     *
+     * @param publicPath the path returned by saveMessageImage(), e.g. "/uploads/messages/abc.jpg"
+     * @return true if file was deleted, false if not found
+     */
+    public boolean deleteMessageImage(String publicPath) {
         try {
             // Remove leading slash and convert to filesystem path
             String relativePath = publicPath.replaceFirst("^/", "");
