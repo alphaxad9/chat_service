@@ -1,16 +1,19 @@
 package com.example.chat_service.api.chat;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.example.chat_service.application.rooms.handlers.RoomQueryHandler;
+import com.example.chat_service.application.rooms.handlers.dtos.GetRoomByIdDTO;
 import com.example.chat_service.application.rooms.handlers.dtos.MyRoomsHomePageListDto;
 import com.example.chat_service.infrastructure.media.MediaUrlService;
 import com.example.chat_service.infrastructure.security.UserContext;
@@ -20,15 +23,15 @@ import jakarta.servlet.http.HttpServletRequest;
 /**
  * REST controller for room query operations (CQRS read-side).
  *
- * <p>Handles HTTP GET requests to retrieve room list data for user home pages via
- * {@code application/json}. All endpoints are prefixed with {@code /api/query/} to avoid
- * path conflicts with the command controller ({@link RoomCommandController}) which
- * handles mutations and returns minimal DTOs.</p>
+ * <p>Handles HTTP GET requests to retrieve room list data for user home pages and
+ * detailed room information via {@code application/json}. All endpoints are prefixed
+ * with {@code /api/query/} to avoid path conflicts with the command controller
+ * ({@link RoomCommandController}) which handles mutations and returns minimal DTOs.</p>
  *
  * <p><strong>CQRS Path Separation:</strong>
  * <ul>
  *   <li>{@code /api/rooms/...} → Command operations (POST/PUT/PATCH/DELETE) returning creation/update DTOs</li>
- *   <li>{@code /api/query/rooms/...} → Query operations (GET) returning enriched {@code MyRoomsHomePageListDto}</li>
+ *   <li>{@code /api/query/rooms/...} → Query operations (GET) returning enriched DTOs</li>
  * </ul>
  * </p>
  *
@@ -42,7 +45,7 @@ import jakarta.servlet.http.HttpServletRequest;
  *   <li>Never trust client-submitted {@code user_id} for user-specific queries — use {@code UserContext}</li>
  *   <li>Always extract the authenticated requester from {@code UserContext} (JWT token)</li>
  *   <li>Query operations are read-only — no state mutations occur in this layer</li>
- *   <li>Authorization checks for sensitive data should be added as needed</li>
+ *   <li>Authorization checks: users can only query rooms they are active members of</li>
  * </ul>
  * </p>
  *
@@ -53,34 +56,30 @@ import jakarta.servlet.http.HttpServletRequest;
  * without polluting the domain layer.</p>
  *
  * <pre>{@code
- * // Response example for room list:
- * [
- *   {
- *     "room_id": "550e8400-e29b-41d4-a716-446655440000",
- *     "name": "Project Team",
- *     "profile_image_url": "http://127.0.0.1:8005/uploads/groups/profile/abc123.jpg",
- *     "has_profile_image": true,
- *     "is_group": true,
- *     "last_activity_at": "2024-01-20T14:22:00Z",
- *     "is_deleted": false,
- *     "last_message": {
- *       "id": "660e8400-e29b-41d4-a716-446655440001",
- *       "room_id": "550e8400-e29b-41d4-a716-446655440000",
- *       "content": "Let's finalize the spec",
- *       "image_url": null,
- *       "created_at": "2024-01-20T14:22:00Z",
- *       "is_mine": false,
- *       "status": "SEEN",
- *       "sender_username": "alice",
- *       "has_image": false
- *     }
- *   }
- * ]
+ * // Response example for room detail (GetRoomByIdDTO):
+ * {
+ *   "room_id": "550e8400-e29b-41d4-a716-446655440000",
+ *   "name": "Project Team",
+ *   "profile_image_url": "http://127.0.0.1:8005/uploads/groups/profile/abc123.jpg",
+ *   "cover_image_url": "http://127.0.0.1:8005/uploads/groups/cover/xyz789.jpg",
+ *   "has_profile_image": true,
+ *   "has_cover_image": true,
+ *   "is_group": true,
+ *   "type": "GROUP",
+ *   "description": "Collaboration space for Project Alpha",
+ *   "creator_id": "71885bbe-1f48-42b6-90e7-f988af5231dd",
+ *   "is_admin": false,
+ *   "is_owner": false,
+ *   "last_activity_at": "2024-01-20T14:22:00Z",
+ *   "created_at": "2024-01-15T10:00:00Z",
+ *   "updated_at": "2024-01-20T14:22:00Z",
+ *   "is_deleted": false
+ * }
  * }</pre>
  * </p>
  *
  * <p><strong>Backend invariant:</strong> Only rooms that have at least one active message
- * are included in the returned list. Rooms without messages are filtered out during processing.</p>
+ * are included in the home page list. Rooms without messages are filtered out during processing.</p>
  */
 @RestController
 @RequestMapping("/api/query/rooms")
@@ -179,7 +178,93 @@ public class RoomQueryController {
     }
 
     // ─────────────────────────────────────────────────────────────────
-    // HELPER METHODS: URL Conversion
+    // SINGLE ROOM DETAIL (Authenticated User - Room Settings/Detail View)
+    // ─────────────────────────────────────────────────────────────────
+
+    /**
+     * Retrieve detailed information for a specific room (settings, member management view).
+     *
+     * <p><strong>Authentication & Authorization:</strong>
+     * <ul>
+     *   <li>User ID extracted from {@code UserContext} (JWT token)</li>
+     *   <li>Returns 404 Not Found if: room doesn't exist, is deleted, or user is not an active member</li>
+     *   <li>Ensures users can only access rooms they participate in</li>
+     * </ul>
+     * </p>
+     *
+     * <p><strong>Response notes:</strong>
+     * <ul>
+     *   <li>For GROUP rooms: includes {@code description}, {@code cover_image_url}, {@code type="GROUP"}</li>
+     *   <li>For DIRECT rooms: {@code name} = other participant's username, {@code profile_image_url} = their picture, {@code description=null}, {@code cover_image_url=null}, {@code type="DIRECT"}</li>
+     *   <li>{@code is_admin} reflects the requesting user's membership status (ADMIN/USER)</li>
+     *   <li>{@code is_owner} is true only if the requesting user created the room</li>
+     *   <li>All timestamps are ISO-8601 formatted strings</li>
+     *   <li>All image URLs are absolute (converted from relative paths)</li>
+     * </ul>
+     * </p>
+     *
+     * <p><strong>Example request:</strong>
+     * <pre>
+     * GET /api/query/rooms/550e8400-e29b-41d4-a716-446655440000
+     * Authorization: Bearer &lt;jwt_token&gt;
+     * </pre>
+     * </p>
+     *
+     * @param roomId the UUID of the room to fetch (path variable)
+     * @return ResponseEntity with GetRoomByIdDTO and HTTP 200, or 404 if not found/not authorized
+     */
+    @GetMapping(
+            path = "/{room_id}",
+            produces = {"application/json"}
+    )
+    public ResponseEntity<GetRoomByIdDTO> getRoomById(
+            @PathVariable("room_id") UUID roomId,
+            HttpServletRequest request
+    ) {
+        UUID userId = UserContext
+                .getUserIdAsUuid()
+                .orElseThrow(() -> {
+                    logger.error("Unauthorized: No authenticated user found in UserContext for getRoomById");
+                    return new RuntimeException("Unauthorized: No authenticated user found in context");
+                });
+
+        logger.info(
+                "Fetching room details: room_id={}, requester_id={}",
+                roomId, userId
+        );
+
+        // ─────────────────────────────────────────────
+        // 1. Delegate to handler for query + authorization
+        //    - Handler returns Optional.empty() if not found or not authorized
+        //    - DTO contains RELATIVE image paths
+        // ─────────────────────────────────────────────
+        Optional<GetRoomByIdDTO> dtoOpt = roomQueryHandler.getRoomById(roomId, userId);
+
+        if (dtoOpt.isEmpty()) {
+            logger.debug(
+                    "Room not found or access denied: room_id={}, requester_id={}",
+                    roomId, userId
+            );
+            return ResponseEntity.notFound().build();
+        }
+
+        // ─────────────────────────────────────────────
+        // 2. Convert relative image URLs to absolute URLs
+        //    - Profile image and cover image (GROUP rooms only have cover)
+        // ─────────────────────────────────────────────
+        GetRoomByIdDTO dto = dtoOpt.get();
+        GetRoomByIdDTO enrichedDto = convertGetRoomDtoUrls(dto, request);
+
+        logger.info(
+                "Successfully returned room detail DTO: room_id={}, name='{}', type={}",
+                enrichedDto.roomId(), enrichedDto.name(), enrichedDto.type()
+        );
+
+        return ResponseEntity.ok(enrichedDto);
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // HELPER METHODS: URL Conversion for MyRoomsHomePageListDto
     // ─────────────────────────────────────────────────────────────────
 
     /**
@@ -225,6 +310,41 @@ public class RoomQueryController {
             String absoluteMessageImageUrl = mediaUrlService.buildMediaUrl(request, dto.lastMessage().imageUrl());
             updated = updated.withLastMessageImageUrl(absoluteMessageImageUrl);
             logger.debug("Converted last message image to absolute URL: {}", absoluteMessageImageUrl);
+        }
+
+        return updated;
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // HELPER METHODS: URL Conversion for GetRoomByIdDTO
+    // ─────────────────────────────────────────────────────────────────
+
+    /**
+     * Convert all relative image URLs in a GetRoomByIdDTO to absolute URLs
+     * using the MediaUrlService and the current HTTP request.
+     *
+     * @param dto the DTO with relative image paths
+     * @param request the current HttpServletRequest for building base URL
+     * @return new DTO instance with absolute image URLs
+     */
+    private GetRoomByIdDTO convertGetRoomDtoUrls(
+            GetRoomByIdDTO dto,
+            HttpServletRequest request
+    ) {
+        GetRoomByIdDTO updated = dto;
+
+        // Convert profile image URL (used for GROUP room avatar or DIRECT room friend's profile)
+        if (dto.hasProfileImage() && dto.profileImageUrl() != null && !dto.profileImageUrl().isBlank()) {
+            String absoluteProfileUrl = mediaUrlService.buildMediaUrl(request, dto.profileImageUrl());
+            updated = updated.withProfileImageUrl(absoluteProfileUrl);
+            logger.debug("Converted profile image to absolute URL: {}", absoluteProfileUrl);
+        }
+
+        // Convert cover image URL (GROUP rooms only - DIRECT rooms have null cover)
+        if (dto.hasCoverImage() && dto.coverImageUrl() != null && !dto.coverImageUrl().isBlank()) {
+            String absoluteCoverUrl = mediaUrlService.buildMediaUrl(request, dto.coverImageUrl());
+            updated = updated.withCoverImageUrl(absoluteCoverUrl);
+            logger.debug("Converted cover image to absolute URL: {}", absoluteCoverUrl);
         }
 
         return updated;

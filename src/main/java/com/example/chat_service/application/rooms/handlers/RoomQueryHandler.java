@@ -5,6 +5,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Component;
 
 import com.example.chat_service.application.members.services.MemberQueryServiceInterface;
 import com.example.chat_service.application.messages.services.MessageQueryServiceInterface;
+import com.example.chat_service.application.rooms.handlers.dtos.GetRoomByIdDTO;
 import com.example.chat_service.application.rooms.handlers.dtos.MyRoomsHomePageListDto;
 import com.example.chat_service.application.rooms.services.RoomQueryServiceInterface;
 import com.example.chat_service.domain.members.Member;
@@ -31,6 +33,7 @@ import com.example.chat_service.external.users.dtos.users.services.UserApiClient
  *   <li>Fetch rooms and latest messages via {@link RoomQueryServiceInterface} and {@link MessageQueryServiceInterface}</li>
  *   <li>Enrich room data with external user info via {@link UserApiClient} (for DIRECT rooms and message senders)</li>
  *   <li>Build {@link MyRoomsHomePageListDto} for WhatsApp-style room list display</li>
+ *   <li>Build {@link GetRoomByIdDTO} for detailed room view (settings, member management)</li>
  *   <li>Apply image-over-text priority and "You" personalization logic in DTO construction</li>
  *   <li>Include unread message count for the current user in each room</li>
  * </ul>
@@ -312,6 +315,128 @@ public class RoomQueryHandler {
         );
 
         return dtos;
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // NEW: Get single room by ID for detail view (settings, member management)
+    // ─────────────────────────────────────────────────────────────────
+
+    /**
+     * Retrieve a single room's full details for the room detail/settings view.
+     *
+     * <p>Flow:
+     * <ol>
+     *   <li>Fetch room by ID via roomQueryService</li>
+     *   <li>Verify current user is an active member of the room (authorization check)</li>
+     *   <li>Fetch user's membership status to determine isAdmin flag</li>
+     *   <li>For DIRECT rooms: find the OTHER participant (not current user) and fetch their UserView</li>
+     *   <li>Build GetRoomByIdDTO with room metadata, admin/owner flags, and timestamps</li>
+     *   <li>Return DTO ready for HTTP response (with relative image paths)</li>
+     * </ol>
+     * </p>
+     *
+     * <p><strong>Authorization:</strong> Returns Optional.empty() if:
+     * <ul>
+     *   <li>Room not found or is deleted</li>
+     *   <li>Current user is not an active member of the room</li>
+     * </ul>
+     * </p>
+     *
+     * <p><strong>Image URL note:</strong> The returned DTO contains RELATIVE image paths.
+     * Use {@link GetRoomByIdDTO#withProfileImageUrl(String)} and
+     * {@link GetRoomByIdDTO#withCoverImageUrl(String)} to convert to absolute URLs
+     * at the controller layer.</p>
+     *
+     * <p><strong>DIRECT room handling:</strong> For DIRECT rooms, the display name and
+     * profile image are dynamically resolved from the OTHER participant's UserView
+     * (not the current user), ensuring consistent UX where each participant sees
+     * the other person's name and picture.</p>
+     *
+     * @param roomId the UUID of the room to fetch
+     * @param currentUserId the authenticated user requesting the room details
+     * @return Optional<GetRoomByIdDTO> with room details, or empty if not found/not authorized
+     */
+    public Optional<GetRoomByIdDTO> getRoomById(UUID roomId, UUID currentUserId) {
+        logger.info("Fetching room details: room_id={}, requester_id={}", roomId, currentUserId);
+
+        // ─────────────────────────────────────────────
+        // 1. Fetch room by ID
+        // ─────────────────────────────────────────────
+        Optional<Room> roomOpt = roomQueryService.getRoomById(roomId);
+        
+        if (roomOpt.isEmpty()) {
+            logger.debug("Room not found or inactive: room_id={}", roomId);
+            return Optional.empty();
+        }
+        
+        Room room = roomOpt.get();
+
+        // ─────────────────────────────────────────────
+        // 2. Verify user is an active member (authorization)
+        // ─────────────────────────────────────────────
+        boolean isMember = memberQueryService.isUserActiveMember(currentUserId, roomId);
+        if (!isMember) {
+            logger.warn(
+                    "Access denied: user_id={} is not an active member of room_id={}",
+                    currentUserId, roomId
+            );
+            return Optional.empty();
+        }
+
+        // ─────────────────────────────────────────────
+        // 3. Fetch user's membership status for isAdmin flag
+        // ─────────────────────────────────────────────
+        Member.Status userStatus = memberQueryService.getMemberStatusInRoom(currentUserId, roomId);
+        boolean isAdmin = (userStatus != null && userStatus == Member.Status.ADMIN);
+        logger.debug(
+                "User membership status: user_id={}, room_id={}, status={}, is_admin={}",
+                currentUserId, roomId, userStatus, isAdmin
+        );
+
+        // ─────────────────────────────────────────────
+        // 4. For DIRECT rooms: fetch the OTHER participant's UserView
+        // ─────────────────────────────────────────────
+        UserView otherParticipantUser = null;
+        if (room.type() == Room.Type.DIRECT) {
+            UUID otherParticipantId = findOtherParticipantInDirectRoom(roomId, currentUserId);
+            if (otherParticipantId != null) {
+                otherParticipantUser = fetchUserView(otherParticipantId);
+                if (otherParticipantUser == null) {
+                    logger.warn(
+                            "Failed to fetch UserView for other participant in DIRECT room: room_id={}, other_participant_id={}",
+                            roomId, otherParticipantId
+                    );
+                    return Optional.empty();
+                }
+                logger.debug(
+                        "Resolved other participant for DIRECT room: room_id={}, other_user_id={}, username={}",
+                        roomId, otherParticipantId, otherParticipantUser.username()
+                );
+            } else {
+                logger.warn(
+                        "Could not find other participant in DIRECT room: room_id={}, current_user_id={}",
+                        roomId, currentUserId
+                );
+                return Optional.empty();
+            }
+        }
+
+        // ─────────────────────────────────────────────
+        // 5. Build DTO using factory method
+        // ─────────────────────────────────────────────
+        GetRoomByIdDTO dto = GetRoomByIdDTO.fromRoom(
+                room,
+                otherParticipantUser,  // For DIRECT: this is the OTHER participant (not current user)
+                isAdmin,
+                currentUserId          // Used for is_owner calculation in DTO factory
+        );
+
+        logger.info(
+                "Successfully built room detail DTO: room_id={}, name='{}', type={}, is_group={}",
+                dto.roomId(), dto.name(), dto.type(), dto.isGroup()
+        );
+
+        return Optional.of(dto);
     }
 
     // ─────────────────────────────────────────────────────────────────
