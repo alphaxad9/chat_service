@@ -2,12 +2,18 @@
 
 package com.example.chat_service.infrastructure.config;
 
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.filter.CorsFilter;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
+import java.util.List;
+
 /**
- * Spring MVC configuration for static resource handling.
+ * Spring MVC configuration for static resource handling and CORS.
  *
  * <p>This configuration exposes the local file upload directory
  * as a public HTTP endpoint, allowing uploaded images to be
@@ -58,6 +64,66 @@ public class WebConfig implements WebMvcConfigurer {
         // Keep default static resource handlers for /static/, /public/, etc.
         // Spring Boot auto-configures these, so we don't override them.
         // ─────────────────────────────────────────────
+    }
+
+    /**
+     * CORS filter configuration to allow frontend requests from localhost:3000.
+     *
+     * <p>This enables:
+     * <ul>
+     *   <li>Cross-origin requests from the React frontend</li>
+     *   <li>Credentials (cookies/JWT tokens) to be sent with requests</li>
+     *   <li>Authorization headers for authenticated endpoints</li>
+     * </ul>
+     * </p>
+     *
+     * @return configured CorsFilter bean
+     */
+    @Bean
+    public CorsFilter corsFilter() {
+        CorsConfiguration config = new CorsConfiguration();
+
+        // FRONTEND URL — update if your frontend runs on a different origin
+        config.setAllowedOrigins(List.of(
+                "http://localhost:3000"
+        ));
+
+        // ALLOW COOKIES / JWT TOKENS TO BE SENT
+        config.setAllowCredentials(true);
+
+        // ALLOW HEADERS — include Authorization for JWT
+        config.setAllowedHeaders(List.of(
+                "Origin",
+                "Content-Type",
+                "Accept",
+                "Authorization",
+                "X-Requested-With",
+                "X-CSRF-TOKEN"
+        ));
+
+        // ALLOW HTTP METHODS
+        config.setAllowedMethods(List.of(
+                "GET",
+                "POST",
+                "PUT",
+                "PATCH",
+                "DELETE",
+                "OPTIONS"
+        ));
+
+        // EXPOSE HEADERS — let frontend read these from responses
+        config.setExposedHeaders(List.of(
+                "Authorization",
+                "Set-Cookie"
+        ));
+
+        // MAX AGE — cache preflight responses (optional)
+        config.setMaxAge(3600L);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+
+        return new CorsFilter(source);
     }
 
     /**
