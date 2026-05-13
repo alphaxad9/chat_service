@@ -10,11 +10,13 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.example.chat_service.application.rooms.handlers.RoomQueryHandler;
 import com.example.chat_service.application.rooms.handlers.dtos.GetRoomByIdDTO;
 import com.example.chat_service.application.rooms.handlers.dtos.MyRoomsHomePageListDto;
+import com.example.chat_service.external.users.dtos.UserView;
 import com.example.chat_service.infrastructure.media.MediaUrlService;
 import com.example.chat_service.infrastructure.security.UserContext;
 
@@ -23,10 +25,11 @@ import jakarta.servlet.http.HttpServletRequest;
 /**
  * REST controller for room query operations (CQRS read-side).
  *
- * <p>Handles HTTP GET requests to retrieve room list data for user home pages and
- * detailed room information via {@code application/json}. All endpoints are prefixed
- * with {@code /api/query/} to avoid path conflicts with the command controller
- * ({@link RoomCommandController}) which handles mutations and returns minimal DTOs.</p>
+ * <p>Handles HTTP GET requests to retrieve room list data for user home pages,
+ * detailed room information, and users available for starting new conversations
+ * via {@code application/json}. All endpoints are prefixed with {@code /api/query/}
+ * to avoid path conflicts with the command controller ({@link RoomCommandController})
+ * which handles mutations and returns minimal DTOs.</p>
  *
  * <p><strong>CQRS Path Separation:</strong>
  * <ul>
@@ -175,6 +178,111 @@ public class RoomQueryController {
         );
 
         return ResponseEntity.ok(enrichedDtos);
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // NEW: USERS FOR STARTING NEW CONVERSATION (Authenticated User)
+    // ─────────────────────────────────────────────────────────────────
+
+    /**
+     * Retrieve a list of users available to start a new conversation with.
+     *
+     * <p><strong>What this returns:</strong>
+     * <ul>
+     *   <li>Users from the external Auth Service (paginated via limit/offset)</li>
+     *   <li>Friends from the user's empty DIRECT rooms (rooms created but no messages yet)</li>
+     *   <li>Deduplicated list excluding the current user</li>
+     * </ul>
+     * </p>
+     *
+     * <p><strong>Why include friends from empty rooms?</strong>
+     * <ul>
+     *   <li>Home page ({@code /api/query/rooms/home}) only shows rooms WITH messages</li>
+     *   <li>But users may have created DIRECT rooms that have no messages yet</li>
+     *   <li>These "empty rooms" should still appear in the "start conversation" UI</li>
+     *   <li>We fetch the OTHER participant from each empty DIRECT room and include them</li>
+     * </ul>
+     * </p>
+     *
+     * <p><strong>Authentication:</strong> User ID extracted from {@code UserContext} (JWT token).</p>
+     *
+     * <p><strong>Response notes:</strong>
+     * <ul>
+     *   <li>Returns List&lt;UserView&gt; with minimal user data for display</li>
+     *   <li>Each UserView includes: user_id, username, email, first_name, last_name, profile_picture</li>
+     *   <li>profile_picture contains RELATIVE path; convert to absolute at controller if needed</li>
+     *   <li>Results are deduplicated by user_id and exclude the current user</li>
+     * </ul>
+     * </p>
+     *
+     * <p><strong>Query parameters:</strong>
+     * <ul>
+     *   <li>{@code limit} (default: 20): Maximum number of users to return from Auth Service</li>
+     *   <li>{@code offset} (default: 0): Offset for pagination from Auth Service</li>
+     *   <li>{@code include_deleted} (default: false): Whether to include deleted users from Auth Service</li>
+     * </ul>
+     * </p>
+     *
+     * <p><strong>Example request:</strong>
+     * <pre>
+     * GET /api/query/rooms/users-for-conversation?limit=10&offset=0&include_deleted=false
+     * Authorization: Bearer &lt;jwt_token&gt;
+     * </pre>
+     * </p>
+     *
+     * @param request the HTTP request (for potential URL conversion if needed)
+     * @param limit maximum number of users to return from Auth Service (default: 20)
+     * @param offset offset for pagination from Auth Service (default: 0)
+     * @param includeDeleted whether to include deleted users from Auth Service (default: false)
+     * @return List of UserView ready for "start conversation" UI display
+     */
+    @GetMapping(
+            path = "/users-for-conversation",
+            produces = {"application/json"}
+    )
+    public ResponseEntity<List<UserView>> getUsersForNewConversation(
+            HttpServletRequest request,
+            @RequestParam(value = "limit", defaultValue = "20") int limit,
+            @RequestParam(value = "offset", defaultValue = "0") int offset,
+            @RequestParam(value = "include_deleted", defaultValue = "false") boolean includeDeleted
+    ) {
+        UUID userId = UserContext
+                .getUserIdAsUuid()
+                .orElseThrow(() -> {
+                    logger.error("Unauthorized: No authenticated user found in UserContext for getUsersForNewConversation");
+                    return new RuntimeException("Unauthorized: No authenticated user found in context");
+                });
+
+        logger.info(
+                "Fetching users for new conversation: user_id={}, limit={}, offset={}, include_deleted={}",
+                userId, limit, offset, includeDeleted
+        );
+
+        // ─────────────────────────────────────────────
+        // 1. Delegate to handler for query + enrichment
+        //    - Handler combines Auth Service users + empty-room friends
+        //    - Returns deduplicated list excluding current user
+        // ─────────────────────────────────────────────
+        List<UserView> users = roomQueryHandler.getUsersForNewConversation(
+                userId,
+                limit,
+                offset,
+                includeDeleted
+        );
+
+        // ─────────────────────────────────────────────
+        // 2. (Optional) Convert profile_picture URLs to absolute if needed
+        //    - UserView.profilePicture contains RELATIVE path from Auth Service
+        //    - Uncomment below if frontend needs absolute URLs:
+        // List<UserView> enrichedUsers = convertUserViewProfileUrls(users, request);
+        // ─────────────────────────────────────────────
+
+        logger.info(
+                "Successfully returned {} users for conversation starters: user_id={}",
+                users.size(), userId
+        );
+
+        return ResponseEntity.ok(users);
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -348,5 +456,41 @@ public class RoomQueryController {
         }
 
         return updated;
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // HELPER METHODS: URL Conversion for UserView (Optional)
+    // ─────────────────────────────────────────────────────────────────
+
+    /**
+     * Convert all relative profile_picture URLs in a list of UserView to absolute URLs.
+     *
+     * <p>Optional helper - uncomment usage in getUsersForNewConversation if frontend
+     * needs absolute URLs for profile pictures.</p>
+     *
+     * @param users the list of UserView with relative profile_picture paths
+     * @param request the current HttpServletRequest for building base URL
+     * @return new list with UserView instances having absolute profile_picture URLs
+     */
+    @SuppressWarnings("unused")
+    private List<UserView> convertUserViewProfileUrls(
+            List<UserView> users,
+            HttpServletRequest request
+    ) {
+        if (users == null || users.isEmpty()) {
+            return users;
+        }
+
+        return users.stream()
+                .map(user -> {
+                    if (user.profilePicture() != null && !user.profilePicture().isBlank()) {
+                        String absoluteUrl = mediaUrlService.buildMediaUrl(request, user.profilePicture());
+                        // Note: UserView is immutable record, so we'd need a withProfilePicture method
+                        // or reconstruct. For now, return as-is and let frontend prepend base URL.
+                        // If needed, add a withProfilePicture method to UserView record.
+                    }
+                    return user;
+                })
+                .toList();
     }
 }

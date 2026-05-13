@@ -3,9 +3,11 @@ package com.example.chat_service.application.rooms.handlers;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -34,6 +36,7 @@ import com.example.chat_service.external.users.dtos.users.services.UserApiClient
  *   <li>Enrich room data with external user info via {@link UserApiClient} (for DIRECT rooms and message senders)</li>
  *   <li>Build {@link MyRoomsHomePageListDto} for WhatsApp-style room list display</li>
  *   <li>Build {@link GetRoomByIdDTO} for detailed room view (settings, member management)</li>
+ *   <li>Provide list of users for "start new conversation" UI (including friends from empty rooms)</li>
  *   <li>Apply image-over-text priority and "You" personalization logic in DTO construction</li>
  *   <li>Include unread message count for the current user in each room</li>
  * </ul>
@@ -315,6 +318,190 @@ public class RoomQueryHandler {
         );
 
         return dtos;
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // NEW: Get users for "start new conversation" UI (includes friends from empty rooms)
+    // ─────────────────────────────────────────────────────────────────
+
+    /**
+     * Retrieve a list of users available to start a new conversation with.
+     *
+     * <p>This endpoint combines two data sources:
+     * <ol>
+     *   <li>Users from the external Auth Service (via {@code getListUsers})</li>
+     *   <li>Friends from the user's empty DIRECT rooms (rooms with no messages yet)</li>
+     * </ol>
+     * </p>
+     *
+     * <p><strong>Why include friends from empty rooms?</strong>
+     * <ul>
+     *   <li>Home page ({@code /api/query/rooms/home}) only shows rooms WITH messages (backend invariant)</li>
+     *   <li>But users may have created DIRECT rooms that have no messages yet (empty conversations)</li>
+     *   <li>These "empty rooms" should still appear in the "start conversation" UI so users can resume chatting</li>
+     *   <li>We fetch the OTHER participant from each empty DIRECT room and include them in the results</li>
+     * </ul>
+     * </p>
+     *
+     * <p><strong>Deduplication & Filtering:</strong>
+     * <ul>
+     *   <li>Excludes the current user ({@code userId}) from results</li>
+     *   <li>Removes duplicate UserViews (by {@code userId}) using a {@code Set}</li>
+     *   <li>Preserves order: Auth Service users first, then empty-room friends appended</li>
+     * </ul>
+     * </p>
+     *
+     * <p><strong>Performance note:</strong> Uses bulk fetching for UserViews where possible.
+     * Empty room friend IDs are fetched in a single query per room, then batch-fetched from Auth Service.</p>
+     *
+     * @param userId the authenticated user requesting the conversation starter list
+     * @param limit maximum number of users to return from Auth Service (passed through to {@code getListUsers})
+     * @param offset offset for pagination from Auth Service (passed through to {@code getListUsers})
+     * @param includeDeleted whether to include deleted users from Auth Service (passed through to {@code getListUsers})
+     * @return List of UserView ready for "start conversation" UI display
+     */
+    public List<UserView> getUsersForNewConversation(
+            UUID userId,
+            int limit,
+            int offset,
+            boolean includeDeleted
+    ) {
+        logger.info(
+                "Fetching users for new conversation: user_id={}, limit={}, offset={}, include_deleted={}",
+                userId, limit, offset, includeDeleted
+        );
+
+        // ─────────────────────────────────────────────
+        // 1. Fetch users from external Auth Service
+        // ─────────────────────────────────────────────
+        List<UserView> authServiceUsers = userApiClient.getListUsers(limit, offset, includeDeleted);
+        logger.debug(
+                "Retrieved {} users from Auth Service for conversation starters",
+                authServiceUsers.size()
+        );
+
+        // ─────────────────────────────────────────────
+        // 2. Find user's empty DIRECT rooms (rooms with no messages)
+        // ─────────────────────────────────────────────
+        List<Member> memberships = memberQueryService.getAllActiveMembershipsByUserId(userId);
+        List<UUID> membershipRoomIds = memberships.stream()
+                .map(Member::roomId)
+                .distinct()
+                .collect(Collectors.toList());
+
+        if (membershipRoomIds.isEmpty()) {
+            logger.debug("No memberships found for user: user_id={}", userId);
+            // Return only Auth Service users, filtered
+            return filterAndDeduplicateUsers(authServiceUsers, userId);
+        }
+
+        // Fetch active rooms for these memberships
+        List<Room> userRooms = roomQueryService.getActiveRoomsByIds(membershipRoomIds);
+        logger.debug(
+                "Retrieved {} active rooms for user memberships: user_id={}",
+                userRooms.size(), userId
+        );
+
+        // ─────────────────────────────────────────────
+        // 3. Filter to DIRECT rooms with NO messages (empty rooms)
+        // ─────────────────────────────────────────────
+        List<UUID> emptyDirectRoomIds = new ArrayList<>();
+        for (Room room : userRooms) {
+            if (room.type() == Room.Type.DIRECT) {
+                // Check if this room has any messages
+                Optional<Message> latestMsg = messageQueryService.getLatestActiveMessageByRoomId(room.id());
+                if (latestMsg.isEmpty()) {
+                    // This is an empty DIRECT room - include it
+                    emptyDirectRoomIds.add(room.id());
+                    logger.debug(
+                            "Found empty DIRECT room for conversation starters: room_id={}, user_id={}",
+                            room.id(), userId
+                    );
+                }
+            }
+        }
+
+        if (emptyDirectRoomIds.isEmpty()) {
+            logger.debug("No empty DIRECT rooms found for user: user_id={}", userId);
+            // Return only Auth Service users, filtered
+            return filterAndDeduplicateUsers(authServiceUsers, userId);
+        }
+
+        // ─────────────────────────────────────────────
+        // 4. Find the OTHER participant in each empty DIRECT room
+        // ─────────────────────────────────────────────
+        List<UUID> emptyRoomFriendIds = new ArrayList<>();
+        for (UUID roomId : emptyDirectRoomIds) {
+            UUID otherParticipantId = findOtherParticipantInDirectRoom(roomId, userId);
+            if (otherParticipantId != null && !otherParticipantId.equals(userId)) {
+                emptyRoomFriendIds.add(otherParticipantId);
+            }
+        }
+
+        if (emptyRoomFriendIds.isEmpty()) {
+            logger.debug("No other participants found in empty rooms for user: user_id={}", userId);
+            return filterAndDeduplicateUsers(authServiceUsers, userId);
+        }
+
+        logger.debug(
+                "Found {} friends from empty DIRECT rooms: user_id={}",
+                emptyRoomFriendIds.size(), userId
+        );
+
+        // ─────────────────────────────────────────────
+        // 5. Fetch UserViews for empty-room friends (batch fetch)
+        // ─────────────────────────────────────────────
+        Map<UUID, UserView> emptyRoomFriendViews = fetchUserViews(emptyRoomFriendIds);
+        List<UserView> emptyRoomFriends = new ArrayList<>(emptyRoomFriendViews.values());
+        logger.debug(
+                "Fetched {} UserViews for empty-room friends: user_id={}",
+                emptyRoomFriends.size(), userId
+        );
+
+        // ─────────────────────────────────────────────
+        // 6. Combine Auth Service users + empty-room friends, deduplicate, exclude self
+        // ─────────────────────────────────────────────
+        List<UserView> combinedUsers = new ArrayList<>(authServiceUsers);
+        combinedUsers.addAll(emptyRoomFriends);
+
+        List<UserView> result = filterAndDeduplicateUsers(combinedUsers, userId);
+
+        logger.info(
+                "Successfully built conversation starter list: total_users={}, auth_service={}, empty_room_friends={}, user_id={}",
+                result.size(), authServiceUsers.size(), emptyRoomFriends.size(), userId
+        );
+
+        return result;
+    }
+
+    /**
+     * Helper to filter out the current user and remove duplicates from a list of UserViews.
+     *
+     * @param users the list of UserViews to filter
+     * @param currentUserId the ID of the current user to exclude
+     * @return filtered and deduplicated list of UserViews
+     */
+    private List<UserView> filterAndDeduplicateUsers(List<UserView> users, UUID currentUserId) {
+        if (users == null || users.isEmpty()) {
+            return List.of();
+        }
+
+        // Use a Set to track seen userIds for deduplication
+        Set<UUID> seenUserIds = new HashSet<>();
+        List<UserView> result = new ArrayList<>();
+
+        for (UserView user : users) {
+            if (user == null || user.userId() == null) {
+                continue; // Skip invalid entries
+            }
+
+            // Exclude current user and duplicates
+            if (!user.userId().equals(currentUserId) && seenUserIds.add(user.userId())) {
+                result.add(user);
+            }
+        }
+
+        return result;
     }
 
     // ─────────────────────────────────────────────────────────────────

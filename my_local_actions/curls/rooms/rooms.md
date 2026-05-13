@@ -51,7 +51,7 @@ curl -X POST http://127.0.0.1:8000/zedvye_one/users/token/ \
 # Create a GROUP room with 2 participants + profile image
 # 🔐 Authenticated user becomes ADMIN/creator automatically
 curl -X POST http://127.0.0.1:8005/api/rooms/groups \
-  --cookie "access_token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzc4NjA3Mjg5LCJpYXQiOjE3Nzg2MDY5ODksImp0aSI6ImVlY2M5ZDNiYjMwZTQ1YjM4OTVjZTFmNGM5ZmZkODMxIiwidXNlcl9pZCI6IjllNmM0MTM4LTMxMjktNDg3NS04ZTcyLTI1ZTRjYjA1OTA1ZCJ9.u0Q_tX-LdjJG0qHZW5mp-eM9tjNZqoDs64j_VWNwzGPGVC_yerWHsW-rzW4f0JP_po8ytAHl0XvHtURldR36LT3dwkysm_nvUwiGaN2v6Brh1x8WcJfMWAPRMw-8UXDXrsrEk4uJAupmzIjV3uKtNNeZpiiqsNvwLNFzqTrWFVHEnhQLBWU0WhqYhmlSe3A3Cn4vDyvORAemFGwkJkClJbOia33KbuYNOk3xG-V00YovS65KGN1AJJczEh5CBjKHKzn-9UsajT4oXLjBnHrTmXrMnunzwI6jd4jve5PSUYFEsACy57g-WywmcVnV1-0jdEmviV3gvK-CtQr_6c4ZXw" \
+  --cookie "access_token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzc4NjU5NjQxLCJpYXQiOjE3Nzg2NTkzNDEsImp0aSI6IjFmZDA1YjFmOGMyNDQ0NWE4NjJkNDNjMGNjNzJiNDRiIiwidXNlcl9pZCI6IjcxODg1YmJlLTFmNDgtNDJiNi05MGU3LWY5ODhhZjUyMzFkZCJ9.DhfaGmDHGEsVjYR3ajt8HdZb6lh09GwfznfXTOAQJxYtamzMnwz98At_htJAifHqg3g-2KQbtZ2kt6FkdVN6ZEeS9ZrMtF5OzdTkmiyOjj7Y9B50HEDcZFyfX7DGe_4Y_bJUkO1yXs07IbpRXKAoFH7U39ADfpZElqHqXxDwXHq19daiTaljC2672lHclkt7omi_AAQ_BqQ_vt-g4xsXv2TPC-VI6cMB3zdmNUiNLFlHmFDtSdt7oP2jX7aBEZB0mPQuKy2Lt6e320o7uhQ8azCW8_jS56X4onVA5vMmo2J3PaAirzoF63c0NaiqmwsRgK4nPhNc6TMm0bPUGNQ80w" \
   -F "group_name=Project Alpha" \
   -F "description=Collaboration space for Project Alpha team" \
   -F 'participant_ids=[  "98787ef6-f118-400c-ad64-66e5634e664c",
@@ -225,7 +225,68 @@ curl -X PATCH "http://127.0.0.1:8005/api/rooms/groups/{room_id}/profile-image?re
 # ✅ Last message: image-over-text priority, "You" personalization when is_mine=true
 curl -X GET http://127.0.0.1:8005/api/query/rooms/home \
   -H "Accept: application/json" \
-  --cookie "access_token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzc4NjU4MTcyLCJpYXQiOjE3Nzg2NTc4NzIsImp0aSI6IjQyOGY1MWYwMDBlZDQxOGZiOGU4YmJlMjcxNzY2YTI4IiwidXNlcl9pZCI6IjcxODg1YmJlLTFmNDgtNDJiNi05MGU3LWY5ODhhZjUyMzFkZCJ9.AYI0Cq6rnKEOHeYbI77-oYGyJXCknDYPH_qGtb49q13HyHmPTYmZ7cX4c8NxfKyS-RsPS2xByCkRRHLQo2pH6yt6IWWQoUxj1WQ6-Z5Z8LHbChrAtFFlxQu6qO0deH-6DJlvWBxCe2F7VKdMXnztxXLtbSq4mqRJhuqEe94Pv6VSIGWRHQ3sx3T3zt_utvYy0W4Ca_GlHy5VT2olQmb5fiUIOk1wN89TBWmokfvXMdjQehMYPskJDkLs5Nn0hGf2f3msVly8aoxTL06NEr1TvrugkPy36_giYjiIMgdIBIrx76jpugU4Ngu62P0TIL087AOfpikcuj0tt_kmIvIZSg" \
+  --cookie "access_token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzc4NjU5NjQxLCJpYXQiOjE3Nzg2NTkzNDEsImp0aSI6IjFmZDA1YjFmOGMyNDQ0NWE4NjJkNDNjMGNjNzJiNDRiIiwidXNlcl9pZCI6IjcxODg1YmJlLTFmNDgtNDJiNi05MGU3LWY5ODhhZjUyMzFkZCJ9.DhfaGmDHGEsVjYR3ajt8HdZb6lh09GwfznfXTOAQJxYtamzMnwz98At_htJAifHqg3g-2KQbtZ2kt6FkdVN6ZEeS9ZrMtF5OzdTkmiyOjj7Y9B50HEDcZFyfX7DGe_4Y_bJUkO1yXs07IbpRXKAoFH7U39ADfpZElqHqXxDwXHq19daiTaljC2672lHclkt7omi_AAQ_BqQ_vt-g4xsXv2TPC-VI6cMB3zdmNUiNLFlHmFDtSdt7oP2jX7aBEZB0mPQuKy2Lt6e320o7uhQ8azCW8_jS56X4onVA5vMmo2J3PaAirzoF63c0NaiqmwsRgK4nPhNc6TMm0bPUGNQ80w" \
   | jq
 
  
+
+
+
+# =============================================================================
+# ROOM QUERY API - SINGLE ROOM DETAIL CURL TEST COMMANDS
+# =============================================================================
+# Base URL: http://127.0.0.1:8005
+# Auth: JWT token via --cookie "access_token=..."
+# All responses piped through jq for pretty JSON formatting
+# 
+# 🔑 Replace {room_id} with an actual room UUID from previous creation responses
+# 🔑 Replace access_token values with fresh tokens from /zedvye_one/users/token/ endpoint
+# =============================================================================
+
+# ───────────────────────────────────────────────────────────────────────────
+# 5. GET SINGLE ROOM BY ID (for room detail/settings view)
+# ───────────────────────────────────────────────────────────────────────────
+
+# Fetch details for a GROUP room (authenticated user must be a member)
+# 🔐 Returns 404 if user is not a member or room doesn't exist
+# ✅ Response includes: name, profile/cover images, description, is_admin, is_owner, timestamps
+curl -X GET http://127.0.0.1:8005/api/query/rooms/baac4bda-9a74-491a-9241-b16ec1914cd2 \
+  -H "Accept: application/json" \
+  --cookie "access_token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzc4NjU5NjQxLCJpYXQiOjE3Nzg2NTkzNDEsImp0aSI6IjFmZDA1YjFmOGMyNDQ0NWE4NjJkNDNjMGNjNzJiNDRiIiwidXNlcl9pZCI6IjcxODg1YmJlLTFmNDgtNDJiNi05MGU3LWY5ODhhZjUyMzFkZCJ9.DhfaGmDHGEsVjYR3ajt8HdZb6lh09GwfznfXTOAQJxYtamzMnwz98At_htJAifHqg3g-2KQbtZ2kt6FkdVN6ZEeS9ZrMtF5OzdTkmiyOjj7Y9B50HEDcZFyfX7DGe_4Y_bJUkO1yXs07IbpRXKAoFH7U39ADfpZElqHqXxDwXHq19daiTaljC2672lHclkt7omi_AAQ_BqQ_vt-g4xsXv2TPC-VI6cMB3zdmNUiNLFlHmFDtSdt7oP2jX7aBEZB0mPQuKy2Lt6e320o7uhQ8azCW8_jS56X4onVA5vMmo2J3PaAirzoF63c0NaiqmwsRgK4nPhNc6TMm0bPUGNQ80w" \
+  | jq
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# =============================================================================
+# ROOM QUERY API - USERS FOR NEW CONVERSATION CURL TEST COMMANDS
+# =============================================================================
+# Base URL: http://127.0.0.1:8005
+# Auth: JWT token via --cookie "access_token=..."
+# All responses piped through jq for pretty JSON formatting
+# 
+# 🔑 Replace access_token values with fresh tokens from /zedvye_one/users/token/ endpoint
+# =============================================================================
+
+# ───────────────────────────────────────────────────────────────────────────
+# 6. GET USERS FOR STARTING NEW CONVERSATION
+# ───────────────────────────────────────────────────────────────────────────
+
+# Fetch users for conversation starters with default pagination (limit=20, offset=0)
+# ✅ Returns: Auth Service users + friends from empty DIRECT rooms (deduplicated, excludes self)
+curl -X GET "http://127.0.0.1:8005/api/query/rooms/users-for-conversation" \
+  -H "Accept: application/json" \
+  --cookie "access_token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzc4NjYwOTU3LCJpYXQiOjE3Nzg2NjA2NTcsImp0aSI6ImM0YTAwZmVjYTM2ODQ2MzhiOGZlOWM3YWU2ODBiYTVkIiwidXNlcl9pZCI6IjBiZWFmMDVmLTNmNDUtNDY2Zi04OTEzLTlmMjE4YjBkNzg4NCJ9.dOCn9scpo2ZJxcdrMcG-atlX-OAJ941P8mQ1ZEqPZvc2_3mJiYBNZtvyjf1Cm2K_ychbnibOp9KnAPrVkWW0_jshCR_m-HuiWzt5cuMR4Q0DHNE9Ntk6E1EB2v3xD3HG2JvCFv9uSVYEo5fge6hHYSNhRtRx3KMGTyTZf6iISaVKVwwkpXhTlX9VTkhl8qj-xMIPzhbops9ot4mhnN-wxF3kb89jGejsmDpyoF4Ll_EcWOtGS6J4RZEurRIYu47u_e0-jCP6mulcM_8HwPGDmbmJODlKIHL4t_sRMwi_YXjnEN6Som6HeVYvdNlvtKT6OT-Kn5qfLY5X2D8VJkwQaQ" \
+  | jq
+
