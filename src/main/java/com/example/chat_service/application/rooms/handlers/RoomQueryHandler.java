@@ -73,8 +73,12 @@ import com.example.chat_service.external.users.dtos.users.services.UserApiClient
  * </ul>
  * </p>
  *
- * <p><strong>Backend invariant:</strong> Only rooms that have at least one active message
- * are included in the returned list. Rooms without messages are filtered out during processing.</p>
+ * <p><strong>Backend invariant:</strong> 
+ * <ul>
+ *   <li><strong>DIRECT rooms:</strong> Only rooms with at least one active message are included in home page list</li>
+ *   <li><strong>GROUP rooms:</strong> Included even if empty (no messages yet) so users can start conversations</li>
+ * </ul>
+ * </p>
  */
 @Component
 public class RoomQueryHandler {
@@ -138,8 +142,12 @@ public class RoomQueryHandler {
      * ({@code findActiveByIds}, {@code findLatestActiveByRoomIds}) to minimize database round-trips.
      * External Auth Service calls are batched where possible.</p>
      *
-     * <p><strong>Backend invariant:</strong> Only rooms with at least one active message
-     * are included in the result. Rooms without messages are explicitly filtered out.</p>
+     * <p><strong>Backend invariant:</strong> 
+     * <ul>
+     *   <li><strong>DIRECT rooms:</strong> Only rooms with at least one active message are included</li>
+     *   <li><strong>GROUP rooms:</strong> Included even if empty (no messages) so users can start conversations</li>
+     * </ul>
+     * </p>
      *
      * @param userId the authenticated user requesting their room list
      * @return List of MyRoomsHomePageListDto ready for HTTP response (with relative image paths)
@@ -241,7 +249,7 @@ public class RoomQueryHandler {
 
         // ─────────────────────────────────────────────
         // 7. Build DTOs for each room using reusable helper
-        //    NOTE: Rooms without a last message are explicitly excluded
+        //    NOTE: Empty DIRECT rooms are excluded; empty GROUP rooms are INCLUDED
         // ─────────────────────────────────────────────
         List<MyRoomsHomePageListDto> dtos = new ArrayList<>(rooms.size());
 
@@ -250,12 +258,18 @@ public class RoomQueryHandler {
                 Message lastMessage = roomToLatestMessage.get(room.id());
                 
                 // ─────────────────────────────────────────
-                // BACKEND INVARIANT: Skip rooms with no messages
-                // Only rooms that have at least one active message are included
+                // BACKEND INVARIANT: 
+                // - Skip DIRECT rooms with no messages (they appear in "start conversation" UI)
+                // - INCLUDE GROUP rooms even with no messages (so users can start conversations)
                 // ─────────────────────────────────────────
-                if (lastMessage == null) {
-                    logger.debug("Skipping room with no messages (backend invariant): room_id={}", room.id());
+                if (lastMessage == null && room.type() == Room.Type.DIRECT) {
+                    logger.debug("Skipping empty DIRECT room (appears in conversation starters): room_id={}", room.id());
                     continue;
+                }
+                
+                // For GROUP rooms without messages, lastMessage will be null - handle gracefully
+                if (lastMessage == null && room.type() == Room.Type.GROUP) {
+                    logger.debug("Including empty GROUP room on home page: room_id={}", room.id());
                 }
 
                 // Resolve the OTHER participant's UserView for DIRECT rooms
@@ -280,8 +294,10 @@ public class RoomQueryHandler {
                     }
                 }
 
-                // Resolve last message sender username
-                String senderUsername = resolveLastMessageSenderUsername(lastMessage, senderIdToUserView);
+                // Resolve last message sender username (null if no message)
+                String senderUsername = (lastMessage != null) 
+                        ? resolveLastMessageSenderUsername(lastMessage, senderIdToUserView) 
+                        : null;
 
                 // Fetch unread message count for current user in this room
                 int unreadCount = memberQueryService.getUnreadMessageCount(userId, room.id());
@@ -290,14 +306,15 @@ public class RoomQueryHandler {
                         userId, room.id(), unreadCount
                 );
 
-                // Build DTO using reusable helper (now includes unreadCount)
+                // Build DTO using reusable helper
+                // For empty GROUP rooms: lastMessage and senderUsername will be null
                 MyRoomsHomePageListDto dto = buildRoomHomePageDto(
                         room,
-                        lastMessage,
-                        otherParticipantUser,  // For DIRECT rooms: this is the OTHER participant
-                        senderUsername,
-                        userId,                // currentUserId for is_mine calculation
-                        unreadCount            // unread count for current user in this room
+                        lastMessage,                   // May be null for empty GROUP rooms
+                        otherParticipantUser,          // For DIRECT rooms: this is the OTHER participant
+                        senderUsername,                // May be null for empty GROUP rooms
+                        userId,                        // currentUserId for is_mine calculation
+                        unreadCount                    // unread count for current user in this room
                 );
 
                 dtos.add(dto);
@@ -336,7 +353,7 @@ public class RoomQueryHandler {
      *
      * <p><strong>Why include friends from empty rooms?</strong>
      * <ul>
-     *   <li>Home page ({@code /api/query/rooms/home}) only shows rooms WITH messages (backend invariant)</li>
+     *   <li>Home page ({@code /api/query/rooms/home}) only shows DIRECT rooms WITH messages</li>
      *   <li>But users may have created DIRECT rooms that have no messages yet (empty conversations)</li>
      *   <li>These "empty rooms" should still appear in the "start conversation" UI so users can resume chatting</li>
      *   <li>We fetch the OTHER participant from each empty DIRECT room and include them in the results</li>
@@ -693,10 +710,10 @@ public class RoomQueryHandler {
      * to convert to absolute URLs at the controller layer.</p>
      *
      * @param room the Room domain object containing room state
-     * @param lastMessage the Message domain object representing the room's last message
+     * @param lastMessage the Message domain object representing the room's last message (may be null for empty GROUP rooms)
      * @param otherParticipantUser the UserView of the OTHER participant in a DIRECT room 
      *        (required for DIRECT rooms, null for GROUP)
-     * @param lastMessageSenderUsername the resolved username of the last message's sender
+     * @param lastMessageSenderUsername the resolved username of the last message's sender (may be null for empty GROUP rooms)
      * @param currentUserId the UUID of the current user (for is_mine calculation in last message)
      * @param unreadCount the count of unread messages for the current user in this room
      * @return MyRoomsHomePageListDto ready for API response (with relative image paths)
@@ -711,11 +728,11 @@ public class RoomQueryHandler {
     ) {
         return MyRoomsHomePageListDto.fromRoomWithLastMessage(
                 room,
-                lastMessage,
-                otherParticipantUser,  // For DIRECT: this is the OTHER participant (not current user)
-                lastMessageSenderUsername,
-                currentUserId,         // Used for is_mine calculation in LastMessagePreview
-                unreadCount            // Unread count for current user in this room
+                lastMessage,                   // May be null for empty GROUP rooms
+                otherParticipantUser,          // For DIRECT: this is the OTHER participant (not current user)
+                lastMessageSenderUsername,     // May be null for empty GROUP rooms
+                currentUserId,                 // Used for is_mine calculation in LastMessagePreview
+                unreadCount                    // Unread count for current user in this room
         );
     }
 

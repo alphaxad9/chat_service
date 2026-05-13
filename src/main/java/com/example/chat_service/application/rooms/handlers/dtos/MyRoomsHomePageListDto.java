@@ -3,6 +3,7 @@ package com.example.chat_service.application.rooms.handlers.dtos;
 import com.example.chat_service.domain.rooms.Room;
 import com.example.chat_service.external.users.dtos.UserView;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonInclude;
 
 import java.time.format.DateTimeFormatter;
 import java.util.UUID;
@@ -16,7 +17,7 @@ import java.util.UUID;
  *   <li>Room identity and type (id, is_group)</li>
  *   <li>Display name (group name for GROUP rooms, friend username for DIRECT rooms)</li>
  *   <li>Profile/cover image URL for visual identification</li>
- *   <li>Last message preview with content/image, timestamp, sender, and status</li>
+ *   <li>Last message preview with content/image, timestamp, sender, and status (nullable for empty GROUP rooms)</li>
  *   <li>Unread message count for the current user ({@code my_unread_messages_in_room})</li>
  *   <li>Context flags (has_profile_image) for conditional UI rendering</li>
  * </ul>
@@ -26,8 +27,14 @@ import java.util.UUID;
  * <ul>
  *   <li>For GROUP rooms: {@code name=groupName}, {@code profileImageUrl} from room metadata</li>
  *   <li>For DIRECT rooms: {@code name=friendUsername}, {@code profileImageUrl=friendProfilePicture}</li>
- *   <li><strong>Backend invariant:</strong> Only rooms with at least one message are included in this list</li>
+ *   <li><strong>Backend invariant:</strong> 
+ *     <ul>
+ *       <li>DIRECT rooms: Only rooms with at least one message are included</li>
+ *       <li>GROUP rooms: Included even if empty (no messages yet)</li>
+ *     </ul>
+ *   </li>
  *   <li>Last message preview follows "image-over-text" priority: if message has image, {@code content} is {@code null} and {@code image_url} is populated</li>
+ *   <li>{@code last_message} is {@code null} for empty GROUP rooms (no messages yet)</li>
  *   <li>All fields use {@code @JsonProperty} for consistent snake_case JSON output</li>
  *   <li>Immutable record pattern ensures thread-safety and predictable state</li>
  * </ul>
@@ -64,17 +71,18 @@ import java.util.UUID;
  *   List<MyRoomsHomePageListDto> dtos = roomData.stream()
  *       .map(rd -> {
  *           Room room = rd.room();
- *           Message lastMsg = rd.lastMessage();
+ *           Message lastMsg = rd.lastMessage(); // May be null for empty GROUP rooms
  *           UserView friendUser = room.isDirect() ? friendIdToUser.get(room.friendId()) : null;
- *           UserView senderUser = authClient.getUserView(lastMsg.senderId());
+ *           UserView senderUser = lastMsg != null ? authClient.getUserView(lastMsg.senderId()) : null;
+ *           String senderUsername = senderUser != null ? senderUser.username() : null;
  *           int unreadCount = roomIdToUnreadCount.getOrDefault(room.id(), 0);
  *           
  *           return MyRoomsHomePageListDto.fromRoomWithLastMessage(
  *               room,
- *               lastMsg,
+ *               lastMsg,  // May be null
  *               friendUser,
- *               senderUser.username(),
- *               userId,  // current user's ID for is_mine calculation
+ *               senderUsername,  // May be null
+ *               userId,
  *               unreadCount
  *           );
  *       })
@@ -84,10 +92,10 @@ import java.util.UUID;
  *   String mediaBaseUrl = "http://127.0.0.1:8005";
  *   dtos = dtos.stream()
  *       .map(dto -> {
- *           dto = dto.withProfileImageUrl(
- *               dto.profileImageUrl() != null ? mediaBaseUrl + dto.profileImageUrl() : null
- *           );
- *           if (dto.lastMessage().imageUrl() != null) {
+ *           if (dto.profileImageUrl() != null) {
+ *               dto = dto.withProfileImageUrl(mediaBaseUrl + dto.profileImageUrl());
+ *           }
+ *           if (dto.lastMessage() != null && dto.lastMessage().imageUrl() != null) {
  *               dto = dto.withLastMessageImageUrl(mediaBaseUrl + dto.lastMessage().imageUrl());
  *           }
  *           return dto;
@@ -122,6 +130,7 @@ public record MyRoomsHomePageListDto(
         boolean isDeleted,
 
         @JsonProperty("last_message")
+        @JsonInclude(JsonInclude.Include.NON_NULL)  // Omit field entirely if null
         LastMessagePreview lastMessage,
 
         @JsonProperty("my_unread_messages_in_room")
@@ -268,14 +277,18 @@ public record MyRoomsHomePageListDto(
      *       {@code UserView.profilePicture} for profile image, sets {@code is_group=false}</li>
      * </ul>
      * 
+     * <p><strong>Empty GROUP rooms:</strong> When {@code lastMessage} is {@code null}
+     * (room has no messages yet), the {@code last_message} field in the DTO will be {@code null}.
+     * This allows empty GROUP rooms to appear on the home page so users can start conversations.</p>
+     * 
      * <p>The profileImageUrl and lastMessage.imageUrl are stored as relative paths;
      * use {@link #withProfileImageUrl(String)} and 
      * {@link LastMessagePreview#withImageUrl(String)} to convert to absolute URLs.</p>
      * 
      * @param room the Room domain object containing room state
-     * @param lastMessage the Message domain object representing the room's last message
+     * @param lastMessage the Message domain object representing the room's last message (may be null for empty GROUP rooms)
      * @param friendUser the UserView of the friend participant (required for DIRECT rooms, null for GROUP)
-     * @param lastMessageSenderUsername the resolved username of the last message's sender
+     * @param lastMessageSenderUsername the resolved username of the last message's sender (may be null for empty GROUP rooms)
      * @param currentUserId the UUID of the current user (for is_mine calculation in last message)
      * @param unreadCount the count of unread messages for the current user in this room
      * @return MyRoomsHomePageListDto ready for API response
@@ -315,12 +328,15 @@ public record MyRoomsHomePageListDto(
             ? room.lastActivityAt().format(DateTimeFormatter.ISO_DATE_TIME) 
             : null;
         
-        // Build last message preview
-        LastMessagePreview lastMessagePreview = LastMessagePreview.fromMessage(
-                lastMessage,
-                lastMessageSenderUsername,
-                currentUserId
-        );
+        // Build last message preview (may be null for empty GROUP rooms)
+        LastMessagePreview lastMessagePreview = null;
+        if (lastMessage != null) {
+            lastMessagePreview = LastMessagePreview.fromMessage(
+                    lastMessage,
+                    lastMessageSenderUsername,
+                    currentUserId
+            );
+        }
         
         return new MyRoomsHomePageListDto(
                 room.id(),
@@ -330,7 +346,7 @@ public record MyRoomsHomePageListDto(
                 isGroup,
                 lastActivityAtStr,
                 room.isDeleted(),
-                lastMessagePreview,
+                lastMessagePreview,  // May be null for empty GROUP rooms
                 unreadCount
         );
     }
@@ -343,7 +359,7 @@ public record MyRoomsHomePageListDto(
      * @param isGroup whether this is a group room
      * @param profileImageUrl optional profile image URL (relative path)
      * @param lastActivityAt the last activity timestamp (ISO-8601 string)
-     * @param lastMessage the LastMessagePreview for this room
+     * @param lastMessage the LastMessagePreview for this room (may be null)
      * @param unreadCount the unread message count for testing purposes
      * @return MyRoomsHomePageListDto for testing purposes
      */
@@ -364,7 +380,7 @@ public record MyRoomsHomePageListDto(
                 isGroup,
                 lastActivityAt,
                 false,  // isDeleted
-                lastMessage,
+                lastMessage,  // May be null
                 unreadCount
         );
     }
@@ -402,7 +418,7 @@ public record MyRoomsHomePageListDto(
                 this.isGroup,
                 this.lastActivityAt,
                 this.isDeleted,
-                this.lastMessage,  // Keep existing lastMessage unchanged
+                this.lastMessage,  // Keep existing lastMessage unchanged (may be null)
                 this.myUnreadMessagesInRoom
         );
     }
