@@ -1,5 +1,6 @@
 package com.example.chat_service.application.rooms.handlers;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -219,7 +220,6 @@ public class RoomQueryHandler {
         
         for (Room room : rooms) {
             if (room.type() == Room.Type.DIRECT) {
-                // Find the OTHER participant in this DIRECT room (not the current user)
                 UUID otherParticipantId = findOtherParticipantInDirectRoom(room.id(), userId);
                 if (otherParticipantId != null) {
                     directRoomOtherParticipantIds.add(otherParticipantId);
@@ -249,7 +249,6 @@ public class RoomQueryHandler {
 
         // ─────────────────────────────────────────────
         // 7. Build DTOs for each room using reusable helper
-        //    NOTE: Empty DIRECT rooms are excluded; empty GROUP rooms are INCLUDED
         // ─────────────────────────────────────────────
         List<MyRoomsHomePageListDto> dtos = new ArrayList<>(rooms.size());
 
@@ -257,22 +256,16 @@ public class RoomQueryHandler {
             try {
                 Message lastMessage = roomToLatestMessage.get(room.id());
                 
-                // ─────────────────────────────────────────
-                // BACKEND INVARIANT: 
-                // - Skip DIRECT rooms with no messages (they appear in "start conversation" UI)
-                // - INCLUDE GROUP rooms even with no messages (so users can start conversations)
-                // ─────────────────────────────────────────
+                // Skip empty DIRECT rooms; include empty GROUP rooms
                 if (lastMessage == null && room.type() == Room.Type.DIRECT) {
                     logger.debug("Skipping empty DIRECT room (appears in conversation starters): room_id={}", room.id());
                     continue;
                 }
                 
-                // For GROUP rooms without messages, lastMessage will be null - handle gracefully
                 if (lastMessage == null && room.type() == Room.Type.GROUP) {
                     logger.debug("Including empty GROUP room on home page: room_id={}", room.id());
                 }
 
-                // Resolve the OTHER participant's UserView for DIRECT rooms
                 UserView otherParticipantUser = null;
                 if (room.type() == Room.Type.DIRECT) {
                     UUID otherParticipantId = findOtherParticipantInDirectRoom(room.id(), userId);
@@ -283,7 +276,7 @@ public class RoomQueryHandler {
                                     "Other participant UserView not found for DIRECT room: room_id={}, other_participant_id={}",
                                     room.id(), otherParticipantId
                             );
-                            continue; // Skip if we can't resolve the other participant's display data
+                            continue;
                         }
                     } else {
                         logger.warn(
@@ -294,34 +287,28 @@ public class RoomQueryHandler {
                     }
                 }
 
-                // Resolve last message sender username (null if no message)
                 String senderUsername = (lastMessage != null) 
                         ? resolveLastMessageSenderUsername(lastMessage, senderIdToUserView) 
                         : null;
 
-                // Fetch unread message count for current user in this room
                 int unreadCount = memberQueryService.getUnreadMessageCount(userId, room.id());
                 logger.debug(
                         "Unread count for user_id={} in room_id={}: {}",
                         userId, room.id(), unreadCount
                 );
 
-                // Build DTO using reusable helper
-                // For empty GROUP rooms: lastMessage and senderUsername will be null
                 MyRoomsHomePageListDto dto = buildRoomHomePageDto(
                         room,
-                        lastMessage,                   // May be null for empty GROUP rooms
-                        otherParticipantUser,          // For DIRECT rooms: this is the OTHER participant
-                        senderUsername,                // May be null for empty GROUP rooms
-                        userId,                        // currentUserId for is_mine calculation
-                        unreadCount                    // unread count for current user in this room
+                        lastMessage,
+                        otherParticipantUser,
+                        senderUsername,
+                        userId,
+                        unreadCount
                 );
 
                 dtos.add(dto);
 
             } catch (Exception e) {
-                // Log but continue processing other rooms
-                // A single room enrichment failure shouldn't break the entire list
                 logger.warn(
                         "Failed to build DTO for room: room_id={}, user_id={}, error={}",
                         room.id(), userId, e.getMessage(), e
@@ -329,8 +316,33 @@ public class RoomQueryHandler {
             }
         }
 
+        // ─────────────────────────────────────────────
+        // 8. SORT: Order rooms by last_activity_at descending (most recent first)
+        //    - Rooms with null last_activity_at go to the end
+        //    - Uses stable sort to preserve relative order for equal timestamps
+        // ─────────────────────────────────────────────
+        dtos.sort((dto1, dto2) -> {
+            String ts1 = dto1.lastActivityAt();
+            String ts2 = dto2.lastActivityAt();
+            
+            // Handle nulls: put them at the end
+            if (ts1 == null && ts2 == null) return 0;
+            if (ts1 == null) return 1;   // dto1 goes after dto2
+            if (ts2 == null) return -1;  // dto1 goes before dto2
+            
+            // Parse ISO-8601 strings and compare (descending order)
+            try {
+                LocalDateTime dt1 = LocalDateTime.parse(ts1);
+                LocalDateTime dt2 = LocalDateTime.parse(ts2);
+                return dt2.compareTo(dt1);  // descending: newer first
+            } catch (Exception e) {
+                // Fallback: string comparison (lexicographic works for ISO-8601)
+                return ts2.compareTo(ts1);
+            }
+        });
+
         logger.info(
-                "Successfully built {} room DTOs for user home page: user_id={}",
+                "Successfully built and sorted {} room DTOs for user home page: user_id={}",
                 dtos.size(), userId
         );
 
