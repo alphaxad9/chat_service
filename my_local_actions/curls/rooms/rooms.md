@@ -30,8 +30,8 @@ curl -X POST http://127.0.0.1:8000/zedvye_one/users/token/ \
   -H "X-CSRFToken: EW8jqY3yDI8veaqY8kUXPT31p5NxLGKrCx4CX7zeXLxa2oETl7pBT57dlvZkLSpa" \
   -c cookies.txt -b cookies.txt \
   -d '{
-    "identifier": "test@example.com",
-    "password": "Test123!"
+    "identifier": "brocode2",
+    "password": "2025New+!"
   }' | jq
 
 
@@ -96,7 +96,7 @@ curl -X POST http://127.0.0.1:8005/api/rooms/direct \
 # Create DIRECT room with different friend
 curl -X POST http://127.0.0.1:8005/api/rooms/direct \
   -H "Content-Type: application/json" \
-  --cookie "access_token=eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzc4NTMwNjc3LCJpYXQiOjE3Nzg1MzAzNzcsImp0aSI6IjczZmRlODFiZWUzNzRhN2U4MGFjZjViY2Q3YjM5ZmQ4IiwidXNlcl9pZCI6IjcxODg1YmJlLTFmNDgtNDJiNi05MGU3LWY5ODhhZjUyMzFkZCJ9.TRbtQQaISwiIMQR-CoFto0Ixd05_wxMVjwBdpzStySyCfYoZO1TrUwDoz6094XoPe5YMi6m-CoJ7BLikpboF1XL-IX1dUOvKOrX5NDXGjLaEGlF5be0tpiiaZeqSc4Sp-kvAkE22Tfyrf1YbzZbXoEOlu8RDB4C9SysJvOIBUg5IO2mVI4g1NAr2Lhlosty-UgZXxvz1wGUchbZXj_xzbMM9FiRkQAut-zGn8Up_L5V4jiHMTC8wx1x-wInqqHU85eYk8GDnBJbgf3L9ngj4oXMmQ97cQ85GEHwqbcHYQydf_p2LIndlDdrgp1NVJlXniz_H9NmrkyYGxYOT3CGNng" \
+  --cookie "access_token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzc4NjU2NTIyLCJpYXQiOjE3Nzg2NTYyMjIsImp0aSI6IjM3ZWMxYzY4Y2M4NzQwY2E4MzdkNDk1ZjQ5ODVjMThlIiwidXNlcl9pZCI6IjcxODg1YmJlLTFmNDgtNDJiNi05MGU3LWY5ODhhZjUyMzFkZCJ9.p7ADslJFYZgBVYel-KyDmHJNwQVz51O30xVZvv2svDmsrVuWnId4vZimUfjPV-YNgc7WgVoebXVPzP__ZDaRQ5FMkNvQNCpWonFWnVF-OrXZIgXxJrDnxxK85V6mdTyatBoLZo2kVA_M_kKFhRGcshwXb4JysGQ0jsoesje-rgcV8dJQ8-siEmc1OHXKkKsjCOXNg5PhOoFb8ZUd9SzsjlbQbXNFFM8FuIdx0mcOZTjSnU1jZSLAdpFKObumGLxJXLAo4B9XguoPlairrQGaBisXIEdGfH5IlBy8H5-6OayS4O4wTbOsNh7o6rBwa_QMdyO-BQnB8n66wILSDfWDAg" \
   -d '{
     "friend_id": "0beaf05f-3f45-466f-8913-9f218b0d7884"
   }' | jq
@@ -183,3 +183,49 @@ curl -X PATCH http://127.0.0.1:8005/api/rooms/groups/fbe31df8-6136-4ff6-bf6d-3b0
 curl -X PATCH "http://127.0.0.1:8005/api/rooms/groups/{room_id}/profile-image?remove=true" \
   --cookie "access_token=eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzc4NTg1NTMzLCJpYXQiOjE3Nzg1ODUyMzMsImp0aSI6IjNjZDZlMzc1Yzg3NTQ5MTdiNDExMjY2NjZhNzMwZDRkIiwidXNlcl9pZCI6IjllNmM0MTM4LTMxMjktNDg3NS04ZTcyLTI1ZTRjYjA1OTA1ZCJ9.ALrFM5Zo1lxN9kB4WstPR5hV9iIKna_wh0-hKJxVH2JF4FnIQZz5D-CclPSu_xgAl2mfYQ_OUrQU1CFr8hMaWUWd3VX4ImtJtXxY1fkUufnAELqViTTUrl7X8EOc1jZtzpEbncZNdJS9kvc4wJqu5QhZV_eRmQFY7CGsDacAKsbJfqGAk7ZIpSPUmJpfo0DiMif_ei9kXoELaEXcRE_P6U1rOxgSXkWRmL0MkGDiBlwtQy4MzCGU8pZB7qImYU9UKZWkfbZOi-VnkOUN_Sc95sh2foXbZV4ep-jV6fEIVegn5SdDYUXfTJ7IU7lPhZCjeXf9SYyaI9SW8gfHsnqLYw" \
   | jq
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# =============================================================================
+# ROOM QUERY API - CURL TEST COMMANDS
+# =============================================================================
+# Base URL: http://127.0.0.1:8005
+# Auth: JWT token via --cookie "access_token=..."
+# All responses piped through jq for pretty JSON formatting
+# 
+# 🔑 Replace access_token values with fresh tokens from /zedvye_one/users/token/ endpoint
+# 🔑 Backend invariant: Only rooms with at least one active message are returned
+# =============================================================================
+
+# ───────────────────────────────────────────────────────────────────────────
+# 4. QUERY ROOMS FOR USER HOME PAGE (GET /api/query/rooms/home)
+# ───────────────────────────────────────────────────────────────────────────
+
+# Fetch authenticated user's room list for home page display
+# 🔐 User ID extracted from JWT token in UserContext
+# ✅ Returns: List<MyRoomsHomePageListDto> with absolute image URLs
+# ✅ Backend invariant: Only rooms with at least one active message included
+# ✅ Room ordering: last_activity_at descending (most recent first)
+# ✅ DIRECT rooms: name=friend's username, profile_image=friend's profile pic
+# ✅ GROUP rooms: name=group name, profile_image=room's profile pic
+# ✅ Last message: image-over-text priority, "You" personalization when is_mine=true
+curl -X GET http://127.0.0.1:8005/api/query/rooms/home \
+  -H "Accept: application/json" \
+  --cookie "access_token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzc4NjU4MTcyLCJpYXQiOjE3Nzg2NTc4NzIsImp0aSI6IjQyOGY1MWYwMDBlZDQxOGZiOGU4YmJlMjcxNzY2YTI4IiwidXNlcl9pZCI6IjcxODg1YmJlLTFmNDgtNDJiNi05MGU3LWY5ODhhZjUyMzFkZCJ9.AYI0Cq6rnKEOHeYbI77-oYGyJXCknDYPH_qGtb49q13HyHmPTYmZ7cX4c8NxfKyS-RsPS2xByCkRRHLQo2pH6yt6IWWQoUxj1WQ6-Z5Z8LHbChrAtFFlxQu6qO0deH-6DJlvWBxCe2F7VKdMXnztxXLtbSq4mqRJhuqEe94Pv6VSIGWRHQ3sx3T3zt_utvYy0W4Ca_GlHy5VT2olQmb5fiUIOk1wN89TBWmokfvXMdjQehMYPskJDkLs5Nn0hGf2f3msVly8aoxTL06NEr1TvrugkPy36_giYjiIMgdIBIrx76jpugU4Ngu62P0TIL087AOfpikcuj0tt_kmIvIZSg" \
+  | jq
+
+ 

@@ -17,6 +17,7 @@ import java.util.UUID;
  *   <li>Display name (group name for GROUP rooms, friend username for DIRECT rooms)</li>
  *   <li>Profile/cover image URL for visual identification</li>
  *   <li>Last message preview with content/image, timestamp, sender, and status</li>
+ *   <li>Unread message count for the current user ({@code my_unread_messages_in_room})</li>
  *   <li>Context flags (has_profile_image) for conditional UI rendering</li>
  * </ul>
  * </p>
@@ -45,6 +46,12 @@ import java.util.UUID;
  *   // Fetch rooms with their last message from repository
  *   List<RoomWithLastMessage> roomData = roomQueryRepository.findRoomsWithLastMessageByUserId(userId);
  *   
+ *   // Fetch unread counts per room for current user
+ *   Map<UUID, Integer> roomIdToUnreadCount = messageQueryRepository.countUnreadByRoomAndUser(
+ *       roomData.stream().map(rd -> rd.room().id()).toList(),
+ *       userId
+ *   );
+ *   
  *   // For DIRECT rooms, fetch friend's UserView from auth service
  *   Map<UUID, UserView> friendIdToUser = authClient.getUsers(
  *       roomData.stream()
@@ -60,13 +67,15 @@ import java.util.UUID;
  *           Message lastMsg = rd.lastMessage();
  *           UserView friendUser = room.isDirect() ? friendIdToUser.get(room.friendId()) : null;
  *           UserView senderUser = authClient.getUserView(lastMsg.senderId());
+ *           int unreadCount = roomIdToUnreadCount.getOrDefault(room.id(), 0);
  *           
  *           return MyRoomsHomePageListDto.fromRoomWithLastMessage(
  *               room,
  *               lastMsg,
  *               friendUser,
  *               senderUser.username(),
- *               userId  // current user's ID for is_mine calculation
+ *               userId,  // current user's ID for is_mine calculation
+ *               unreadCount
  *           );
  *       })
  *       .toList();
@@ -113,7 +122,10 @@ public record MyRoomsHomePageListDto(
         boolean isDeleted,
 
         @JsonProperty("last_message")
-        LastMessagePreview lastMessage
+        LastMessagePreview lastMessage,
+
+        @JsonProperty("my_unread_messages_in_room")
+        int myUnreadMessagesInRoom
 
 ) {
 
@@ -265,6 +277,7 @@ public record MyRoomsHomePageListDto(
      * @param friendUser the UserView of the friend participant (required for DIRECT rooms, null for GROUP)
      * @param lastMessageSenderUsername the resolved username of the last message's sender
      * @param currentUserId the UUID of the current user (for is_mine calculation in last message)
+     * @param unreadCount the count of unread messages for the current user in this room
      * @return MyRoomsHomePageListDto ready for API response
      * @throws IllegalArgumentException if friendUser is null for a DIRECT room
      */
@@ -273,7 +286,8 @@ public record MyRoomsHomePageListDto(
             com.example.chat_service.domain.messages.Message lastMessage,
             UserView friendUser,
             String lastMessageSenderUsername,
-            UUID currentUserId
+            UUID currentUserId,
+            int unreadCount
     ) {
         String displayName = null;
         String relativeImageUrl = null;
@@ -316,7 +330,8 @@ public record MyRoomsHomePageListDto(
                 isGroup,
                 lastActivityAtStr,
                 room.isDeleted(),
-                lastMessagePreview
+                lastMessagePreview,
+                unreadCount
         );
     }
 
@@ -329,6 +344,7 @@ public record MyRoomsHomePageListDto(
      * @param profileImageUrl optional profile image URL (relative path)
      * @param lastActivityAt the last activity timestamp (ISO-8601 string)
      * @param lastMessage the LastMessagePreview for this room
+     * @param unreadCount the unread message count for testing purposes
      * @return MyRoomsHomePageListDto for testing purposes
      */
     public static MyRoomsHomePageListDto forTesting(
@@ -337,7 +353,8 @@ public record MyRoomsHomePageListDto(
             boolean isGroup,
             String profileImageUrl,
             String lastActivityAt,
-            LastMessagePreview lastMessage
+            LastMessagePreview lastMessage,
+            int unreadCount
     ) {
         return new MyRoomsHomePageListDto(
                 roomId,
@@ -347,7 +364,8 @@ public record MyRoomsHomePageListDto(
                 isGroup,
                 lastActivityAt,
                 false,  // isDeleted
-                lastMessage
+                lastMessage,
+                unreadCount
         );
     }
 
@@ -384,7 +402,8 @@ public record MyRoomsHomePageListDto(
                 this.isGroup,
                 this.lastActivityAt,
                 this.isDeleted,
-                this.lastMessage  // Keep existing lastMessage unchanged
+                this.lastMessage,  // Keep existing lastMessage unchanged
+                this.myUnreadMessagesInRoom
         );
     }
 
@@ -410,7 +429,8 @@ public record MyRoomsHomePageListDto(
                 this.isGroup,
                 this.lastActivityAt,
                 this.isDeleted,
-                updatedPreview
+                updatedPreview,
+                this.myUnreadMessagesInRoom
         );
     }
 }

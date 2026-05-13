@@ -32,6 +32,7 @@ import com.example.chat_service.external.users.dtos.users.services.UserApiClient
  *   <li>Enrich room data with external user info via {@link UserApiClient} (for DIRECT rooms and message senders)</li>
  *   <li>Build {@link MyRoomsHomePageListDto} for WhatsApp-style room list display</li>
  *   <li>Apply image-over-text priority and "You" personalization logic in DTO construction</li>
+ *   <li>Include unread message count for the current user in each room</li>
  * </ul>
  * </p>
  *
@@ -115,7 +116,7 @@ public class RoomQueryHandler {
      *   <li>Fetch active rooms via roomQueryService (bulk lookup)</li>
      *   <li>Fetch latest active messages for each room via messageQueryService (bulk lookup)</li>
      *   <li>For DIRECT rooms: find the OTHER participant (not current user) and fetch their UserView</li>
-     *   <li>For each room: resolve display name, profile image, and last message sender username</li>
+     *   <li>For each room: resolve display name, profile image, last message sender username, and unread count</li>
      *   <li>Build MyRoomsHomePageListDto for each room using reusable helper</li>
      *   <li>Return list of DTOs ready for HTTP response (with relative image paths)</li>
      * </ol>
@@ -276,13 +277,21 @@ public class RoomQueryHandler {
                 // Resolve last message sender username
                 String senderUsername = resolveLastMessageSenderUsername(lastMessage, senderIdToUserView);
 
-                // Build DTO using reusable helper
+                // Fetch unread message count for current user in this room
+                int unreadCount = memberQueryService.getUnreadMessageCount(userId, room.id());
+                logger.debug(
+                        "Unread count for user_id={} in room_id={}: {}",
+                        userId, room.id(), unreadCount
+                );
+
+                // Build DTO using reusable helper (now includes unreadCount)
                 MyRoomsHomePageListDto dto = buildRoomHomePageDto(
                         room,
                         lastMessage,
                         otherParticipantUser,  // For DIRECT rooms: this is the OTHER participant
                         senderUsername,
-                        userId  // currentUserId for is_mine calculation
+                        userId,                // currentUserId for is_mine calculation
+                        unreadCount            // unread count for current user in this room
                 );
 
                 dtos.add(dto);
@@ -354,6 +363,7 @@ public class RoomQueryHandler {
      *   <li>Building LastMessagePreview with image-over-text priority</li>
      *   <li>Applying "You" personalization when requester is the message sender</li>
      *   <li>Formatting timestamps as ISO-8601 strings</li>
+     *   <li>Fetching unread message count for current user in this room</li>
      * </ol>
      * </p>
      *
@@ -376,6 +386,7 @@ public class RoomQueryHandler {
      *        (required for DIRECT rooms, null for GROUP)
      * @param lastMessageSenderUsername the resolved username of the last message's sender
      * @param currentUserId the UUID of the current user (for is_mine calculation in last message)
+     * @param unreadCount the count of unread messages for the current user in this room
      * @return MyRoomsHomePageListDto ready for API response (with relative image paths)
      */
     private MyRoomsHomePageListDto buildRoomHomePageDto(
@@ -383,14 +394,16 @@ public class RoomQueryHandler {
             Message lastMessage,
             UserView otherParticipantUser,
             String lastMessageSenderUsername,
-            UUID currentUserId
+            UUID currentUserId,
+            int unreadCount
     ) {
         return MyRoomsHomePageListDto.fromRoomWithLastMessage(
                 room,
                 lastMessage,
                 otherParticipantUser,  // For DIRECT: this is the OTHER participant (not current user)
                 lastMessageSenderUsername,
-                currentUserId  // Used for is_mine calculation in LastMessagePreview
+                currentUserId,         // Used for is_mine calculation in LastMessagePreview
+                unreadCount            // Unread count for current user in this room
         );
     }
 

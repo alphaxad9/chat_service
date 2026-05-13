@@ -54,9 +54,9 @@ curl -X POST http://127.0.0.1:8005/api/messages \
 # Send another text message from a different user to test unread count increment
 curl -X POST http://127.0.0.1:8005/api/messages \
   -H "Content-Type: application/json" \
-  --cookie "access_token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzc4NjA3Mjg5LCJpYXQiOjE3Nzg2MDY5ODksImp0aSI6ImVlY2M5ZDNiYjMwZTQ1YjM4OTVjZTFmNGM5ZmZkODMxIiwidXNlcl9pZCI6IjllNmM0MTM4LTMxMjktNDg3NS04ZTcyLTI1ZTRjYjA1OTA1ZCJ9.u0Q_tX-LdjJG0qHZW5mp-eM9tjNZqoDs64j_VWNwzGPGVC_yerWHsW-rzW4f0JP_po8ytAHl0XvHtURldR36LT3dwkysm_nvUwiGaN2v6Brh1x8WcJfMWAPRMw-8UXDXrsrEk4uJAupmzIjV3uKtNNeZpiiqsNvwLNFzqTrWFVHEnhQLBWU0WhqYhmlSe3A3Cn4vDyvORAemFGwkJkClJbOia33KbuYNOk3xG-V00YovS65KGN1AJJczEh5CBjKHKzn-9UsajT4oXLjBnHrTmXrMnunzwI6jd4jve5PSUYFEsACy57g-WywmcVnV1-0jdEmviV3gvK-CtQr_6c4ZXw" \
+  --cookie "access_token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzc4NjU3MzA1LCJpYXQiOjE3Nzg2NTcwMDUsImp0aSI6IjljZTNhNWY2MWU4MTRiMDhiODliNWFmZDFlYjI1Y2EzIiwidXNlcl9pZCI6IjBiZWFmMDVmLTNmNDUtNDY2Zi04OTEzLTlmMjE4YjBkNzg4NCJ9.KQ3Z0m_lpTaXAdi7hT82w0W-4pJmJRhPomYHdDs8KrR8w2hfttz4q2md3YbA6nfj_cwqMhamcmX92PPVkVp8a3Db_WOlklGQoZ9yVkcqHkAD1-DLeYBYdn9NhpgudM3CmGOBx4-YRGZ5446vNNK4e0NzTTJyWbm3O7yt0pGM1b0Hk47cSLaLqErzV9awAt12MF6EPw-Na5ZK1KmDbX3Ehsz-QMg8j1X_hIBxbmAhHiVeSdzP47bvAixyR7JyVlEdGoNzQI-yYJ1AQ7c3RP9HyvbPK9BqdwIRYsei5Q80cKyOkkAEamDm0o-napebFQYIMfALoQCQOmkotX71732iSQ" \
   -d '{
-    "room_id": "ca9ee906-a23a-4e07-9cb5-08684cf3b21a",
+    "room_id": "80f9ba85-10fc-40a8-bc79-4ab4d98290d0",
     "content": "Thanks for the update! I have a few questions about the timeline."
   }' | jq
 
