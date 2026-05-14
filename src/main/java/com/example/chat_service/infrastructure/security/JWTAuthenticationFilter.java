@@ -89,7 +89,9 @@ public class JWTAuthenticationFilter extends OncePerRequestFilter {
             sendUnauthorized(response, e.getMessage());
             
         } catch (Exception e) {
-            logger.error("Unexpected error during JWT verification for request {}", requestURI, e);
+            // ✅ ENHANCED LOGGING: Print exception class + message + stack trace
+            logger.error("Unexpected error during JWT verification for request {}: {} - {}", 
+                        requestURI, e.getClass().getName(), e.getMessage(), e);
             sendUnauthorized(response, "Authentication failed");
             
         } finally {

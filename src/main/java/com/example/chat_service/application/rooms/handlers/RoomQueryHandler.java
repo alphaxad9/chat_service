@@ -257,14 +257,14 @@ public class RoomQueryHandler {
                 Message lastMessage = roomToLatestMessage.get(room.id());
                 
                 // Skip empty DIRECT rooms; include empty GROUP rooms
-                if (lastMessage == null && room.type() == Room.Type.DIRECT) {
-                    logger.debug("Skipping empty DIRECT room (appears in conversation starters): room_id={}", room.id());
-                    continue;
-                }
+                // if (lastMessage == null && room.type() == Room.Type.DIRECT) {
+                //     logger.debug("Skipping empty DIRECT room (appears in conversation starters): room_id={}", room.id());
+                //     continue;
+                // }
                 
-                if (lastMessage == null && room.type() == Room.Type.GROUP) {
-                    logger.debug("Including empty GROUP room on home page: room_id={}", room.id());
-                }
+                // if (lastMessage == null && room.type() == Room.Type.GROUP) {
+                //     logger.debug("Including empty GROUP room on home page: room_id={}", room.id());
+                // }
 
                 UserView otherParticipantUser = null;
                 if (room.type() == Room.Type.DIRECT) {
