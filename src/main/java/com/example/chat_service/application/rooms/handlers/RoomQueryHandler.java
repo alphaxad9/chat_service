@@ -17,6 +17,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import com.example.chat_service.application.members.services.MemberQueryServiceInterface;
+import com.example.chat_service.application.messages.services.MessageCommandServiceInterface;
 import com.example.chat_service.application.messages.services.MessageQueryServiceInterface;
 import com.example.chat_service.application.rooms.handlers.dtos.GetRoomByIdDTO;
 import com.example.chat_service.application.rooms.handlers.dtos.MyRoomsHomePageListDto;
@@ -90,6 +91,7 @@ public class RoomQueryHandler {
     private final MemberQueryServiceInterface memberQueryService;
     private final RoomQueryServiceInterface roomQueryService;
     private final MessageQueryServiceInterface messageQueryService;
+    private final MessageCommandServiceInterface messageCommandService;
     private final UserApiClient userApiClient;
 
     /**
@@ -99,17 +101,20 @@ public class RoomQueryHandler {
      * @param memberQueryService handles read operations for Member entities
      * @param roomQueryService handles read operations for Room entities
      * @param messageQueryService handles read operations for Message entities
+     * @param messageCommandService handles write operations for Message entities (e.g., markAsReceived)
      * @param userApiClient fetches user data from external Auth Service
      */
     public RoomQueryHandler(
             MemberQueryServiceInterface memberQueryService,
             RoomQueryServiceInterface roomQueryService,
             MessageQueryServiceInterface messageQueryService,
+            MessageCommandServiceInterface messageCommandService,
             UserApiClient userApiClient
     ) {
         this.memberQueryService = memberQueryService;
         this.roomQueryService = roomQueryService;
         this.messageQueryService = messageQueryService;
+        this.messageCommandService = messageCommandService;
         this.userApiClient = userApiClient;
     }
 
@@ -126,6 +131,8 @@ public class RoomQueryHandler {
      *   <li>Extract room IDs from memberships</li>
      *   <li>Fetch active rooms via roomQueryService (bulk lookup)</li>
      *   <li>Fetch latest active messages for each room via messageQueryService (bulk lookup)</li>
+     *   <li><strong>For each room: mark all messages as RECEIVED via bulkMarkAsReceivedInRoom</strong></li>
+     *   <li><strong>For each room with a latest message: also call markAsReceived on that specific message</strong></li>
      *   <li>For DIRECT rooms: find the OTHER participant (not current user) and fetch their UserView</li>
      *   <li>For each room: resolve display name, profile image, last message sender username, and unread count</li>
      *   <li>Build MyRoomsHomePageListDto for each room using reusable helper</li>
@@ -149,6 +156,11 @@ public class RoomQueryHandler {
      *   <li><strong>GROUP rooms:</strong> Included even if empty (no messages) so users can start conversations</li>
      * </ul>
      * </p>
+     *
+     * <p><strong>Read receipt note:</strong> This method automatically marks all messages as RECEIVED
+     * for the current user before returning rooms. Both bulk operation ({@code bulkMarkAsReceivedInRoom})
+     * and individual message operation ({@code markAsReceived} for the latest message) are performed.
+     * If any read receipt operation fails, the error is logged but the room query continues (fail-soft).</p>
      *
      * @param userId the authenticated user requesting their room list
      * @return List of MyRoomsHomePageListDto ready for HTTP response (with relative image paths)
@@ -213,7 +225,49 @@ public class RoomQueryHandler {
         );
 
         // ─────────────────────────────────────────────
-        // 5. For DIRECT rooms: find the OTHER participant (not current user)
+        // 5. MARK ALL MESSAGES AS RECEIVED (Read Receipt Automation)
+        //    - For each room: call bulkMarkAsReceivedInRoom to mark all active messages
+        //    - For each room with a latest message: also call markAsReceived on that specific message
+        //    - Fail-soft: log errors but continue with room query
+        // ─────────────────────────────────────────────
+        for (Room room : rooms) {
+            try {
+                // Bulk mark all active messages in room as RECEIVED
+                int markedCount = messageCommandService.bulkMarkAsReceivedInRoom(room.id(), userId);
+                logger.trace(
+                        "Bulk marked {} messages as RECEIVED in room: room_id={}, user_id={}",
+                        markedCount, room.id(), userId
+                );
+
+                // Also explicitly mark the latest/top message as RECEIVED (double-check)
+                Message latestMessage = roomToLatestMessage.get(room.id());
+                if (latestMessage != null) {
+                    try {
+                        messageCommandService.markAsReceived(latestMessage.id(), userId);
+                        logger.trace(
+                                "Explicitly marked latest message as RECEIVED: message_id={}, room_id={}, user_id={}",
+                                latestMessage.id(), room.id(), userId
+                        );
+                    } catch (Exception e) {
+                        // Log but continue - bulk operation already handled most cases
+                        logger.trace(
+                                "Failed to mark latest message individually (non-blocking): message_id={}, room_id={}, user_id={}, error={}",
+                                latestMessage.id(), room.id(), userId, e.getMessage()
+                        );
+                    }
+                }
+
+            } catch (Exception e) {
+                // Log but continue - room query should not fail if read receipt fails
+                logger.warn(
+                        "Failed to mark messages as received in room (non-blocking): room_id={}, user_id={}, error={}",
+                        room.id(), userId, e.getMessage()
+                );
+            }
+        }
+
+        // ─────────────────────────────────────────────
+        // 6. For DIRECT rooms: find the OTHER participant (not current user)
         //    and collect their user IDs for fetching UserViews
         // ─────────────────────────────────────────────
         List<UUID> directRoomOtherParticipantIds = new ArrayList<>();
@@ -234,7 +288,7 @@ public class RoomQueryHandler {
         );
 
         // ─────────────────────────────────────────────
-        // 6. Collect sender IDs from latest messages (for fetching sender usernames)
+        // 7. Collect sender IDs from latest messages (for fetching sender usernames)
         // ─────────────────────────────────────────────
         List<UUID> senderIds = roomToLatestMessage.values().stream()
                 .map(Message::senderId)
@@ -248,7 +302,7 @@ public class RoomQueryHandler {
         );
 
         // ─────────────────────────────────────────────
-        // 7. Build DTOs for each room using reusable helper
+        // 8. Build DTOs for each room using reusable helper
         // ─────────────────────────────────────────────
         List<MyRoomsHomePageListDto> dtos = new ArrayList<>(rooms.size());
 
@@ -317,7 +371,7 @@ public class RoomQueryHandler {
         }
 
         // ─────────────────────────────────────────────
-        // 8. SORT: Order rooms by last_activity_at descending (most recent first)
+        // 9. SORT: Order rooms by last_activity_at descending (most recent first)
         //    - Rooms with null last_activity_at go to the end
         //    - Uses stable sort to preserve relative order for equal timestamps
         // ─────────────────────────────────────────────
@@ -526,6 +580,125 @@ public class RoomQueryHandler {
 
             // Exclude current user and duplicates
             if (!user.userId().equals(currentUserId) && seenUserIds.add(user.userId())) {
+                result.add(user);
+            }
+        }
+
+        return result;
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // NEW: Get users available to add to a group room
+    // ─────────────────────────────────────────────────────────────────
+
+    /**
+     * Retrieve a list of users available to add to a group room.
+     *
+     * <p>This endpoint combines two data sources:
+     * <ol>
+     *   <li>Users from the external Auth Service (via {@code getListUsers})</li>
+     *   <li>Filters out users who are already members of the specified room</li>
+     *   <li>Excludes the requester (current user) since they are already the admin</li>
+     * </ol>
+     * </p>
+     *
+     * <p><strong>Deduplication & Filtering:</strong>
+     * <ul>
+     *   <li>Excludes the requester ({@code requesterId}) from results</li>
+     *   <li>Removes users who are already active members of the room</li>
+     *   <li>Removes duplicate UserViews (by {@code userId}) using a {@code Set}</li>
+     * </ul>
+     * </p>
+     *
+     * <p><strong>Performance note:</strong> Uses bulk fetching for UserViews where possible.
+     * Member IDs are fetched in a single query, then filtered in-memory.</p>
+     *
+     * @param roomId the UUID of the group room to add users to
+     * @param requesterId the authenticated user requesting the list (group admin)
+     * @param limit maximum number of users to return from Auth Service
+     * @param offset offset for pagination from Auth Service
+     * @param includeDeleted whether to include deleted users from Auth Service
+     * @return List of UserView ready for "add to group" UI display, excluding existing members and requester
+     */
+    public List<UserView> getUsersToAddInGroup(
+            UUID roomId,
+            UUID requesterId,
+            int limit,
+            int offset,
+            boolean includeDeleted
+    ) {
+        logger.info(
+                "Fetching users to add to group: room_id={}, requester_id={}, limit={}, offset={}, include_deleted={}",
+                roomId, requesterId, limit, offset, includeDeleted
+        );
+
+        // ─────────────────────────────────────────────
+        // 1. Fetch users from external Auth Service
+        // ─────────────────────────────────────────────
+        List<UserView> authServiceUsers = userApiClient.getListUsers(limit, offset, includeDeleted);
+        logger.debug(
+                "Retrieved {} users from Auth Service for group addition",
+                authServiceUsers.size()
+        );
+
+        // ─────────────────────────────────────────────
+        // 2. Fetch existing members of the room to exclude them
+        // ─────────────────────────────────────────────
+        List<Member> existingMembers = memberQueryService.getAllActiveMembersByRoomId(roomId);
+        Set<UUID> existingMemberIds = existingMembers.stream()
+                .map(Member::userId)
+                .collect(Collectors.toSet());
+        
+        logger.debug(
+                "Retrieved {} existing members for room_id={} to exclude from results",
+                existingMemberIds.size(), roomId
+        );
+
+        // ─────────────────────────────────────────────
+        // 3. Filter: exclude existing members and the requester
+        // ─────────────────────────────────────────────
+        List<UserView> result = filterAndDeduplicateUsersForGroupAddition(
+                authServiceUsers, requesterId, existingMemberIds
+        );
+
+        logger.info(
+                "Successfully built user list for group addition: total_available={}, excluded_members={}, excluded_requester={}, room_id={}",
+                result.size(), existingMemberIds.size(), 1, roomId
+        );
+
+        return result;
+    }
+
+    /**
+     * Helper to filter out existing members, the requester, and remove duplicates from a list of UserViews.
+     *
+     * @param users the list of UserViews to filter
+     * @param requesterId the ID of the current user (requester) to exclude
+     * @param existingMemberIds set of user IDs who are already members of the room
+     * @return filtered and deduplicated list of UserViews
+     */
+    private List<UserView> filterAndDeduplicateUsersForGroupAddition(
+            List<UserView> users, 
+            UUID requesterId, 
+            Set<UUID> existingMemberIds
+    ) {
+        if (users == null || users.isEmpty()) {
+            return List.of();
+        }
+
+        // Use a Set to track seen userIds for deduplication
+        Set<UUID> seenUserIds = new HashSet<>();
+        List<UserView> result = new ArrayList<>();
+
+        for (UserView user : users) {
+            if (user == null || user.userId() == null) {
+                continue; // Skip invalid entries
+            }
+
+            // Exclude requester, existing members, and duplicates
+            if (!user.userId().equals(requesterId) 
+                    && !existingMemberIds.contains(user.userId()) 
+                    && seenUserIds.add(user.userId())) {
                 result.add(user);
             }
         }

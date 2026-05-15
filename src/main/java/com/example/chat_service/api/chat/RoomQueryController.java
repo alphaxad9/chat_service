@@ -286,6 +286,108 @@ public class RoomQueryController {
     }
 
     // ─────────────────────────────────────────────────────────────────
+    // NEW: USERS AVAILABLE TO ADD TO A GROUP ROOM (Authenticated User)
+    // ─────────────────────────────────────────────────────────────────
+
+    /**
+     * Retrieve a list of users available to add to a specific group room.
+     *
+     * <p><strong>What this returns:</strong>
+     * <ul>
+     *   <li>Users from the external Auth Service (paginated via limit/offset)</li>
+     *   <li>Filtered to exclude users who are already members of the specified room</li>
+     *   <li>Excludes the requester (current user) since they are already the admin</li>
+     *   <li>Deduplicated list by user_id</li>
+     * </ul>
+     * </p>
+     *
+     * <p><strong>Authorization:</strong> User ID extracted from {@code UserContext} (JWT token).
+     * The handler does not enforce room membership checks here — that should be done at the
+     * service/command layer when actually adding members. This endpoint is for UI population only.</p>
+     *
+     * <p><strong>Response notes:</strong>
+     * <ul>
+     *   <li>Returns List&lt;UserView&gt; with minimal user data for display in "Add Members" UI</li>
+     *   <li>Each UserView includes: user_id, username, email, first_name, last_name, profile_picture</li>
+     *   <li>profile_picture contains RELATIVE path; convert to absolute at controller if needed</li>
+     *   <li>Results are deduplicated by user_id and exclude existing members + requester</li>
+     * </ul>
+     * </p>
+     *
+     * <p><strong>Query parameters:</strong>
+     * <ul>
+     *   <li>{@code limit} (default: 20): Maximum number of users to return from Auth Service</li>
+     *   <li>{@code offset} (default: 0): Offset for pagination from Auth Service</li>
+     *   <li>{@code include_deleted} (default: false): Whether to include deleted users from Auth Service</li>
+     * </ul>
+     * </p>
+     *
+     * <p><strong>Example request:</strong>
+     * <pre>
+     * GET /api/query/rooms/550e8400-e29b-41d4-a716-446655440000/users-to-add?limit=10&offset=0&include_deleted=false
+     * Authorization: Bearer &lt;jwt_token&gt;
+     * </pre>
+     * </p>
+     *
+     * @param roomId the UUID of the group room to add users to (path variable)
+     * @param request the HTTP request (for potential URL conversion if needed)
+     * @param limit maximum number of users to return from Auth Service (default: 20)
+     * @param offset offset for pagination from Auth Service (default: 0)
+     * @param includeDeleted whether to include deleted users from Auth Service (default: false)
+     * @return List of UserView ready for "add to group" UI display, excluding existing members and requester
+     */
+    @GetMapping(
+            path = "/{room_id}/users-to-add",
+            produces = {"application/json"}
+    )
+    public ResponseEntity<List<UserView>> getUsersToAddInGroup(
+            @PathVariable("room_id") UUID roomId,
+            HttpServletRequest request,
+            @RequestParam(value = "limit", defaultValue = "20") int limit,
+            @RequestParam(value = "offset", defaultValue = "0") int offset,
+            @RequestParam(value = "include_deleted", defaultValue = "false") boolean includeDeleted
+    ) {
+        UUID requesterId = UserContext
+                .getUserIdAsUuid()
+                .orElseThrow(() -> {
+                    logger.error("Unauthorized: No authenticated user found in UserContext for getUsersToAddInGroup");
+                    return new RuntimeException("Unauthorized: No authenticated user found in context");
+                });
+
+        logger.info(
+                "Fetching users to add to group: room_id={}, requester_id={}, limit={}, offset={}, include_deleted={}",
+                roomId, requesterId, limit, offset, includeDeleted
+        );
+
+        // ─────────────────────────────────────────────
+        // 1. Delegate to handler for query + filtering
+        //    - Handler fetches Auth Service users and filters out existing members + requester
+        //    - Returns deduplicated list of available users
+        // ─────────────────────────────────────────────
+        List<UserView> users = roomQueryHandler.getUsersToAddInGroup(
+                roomId,
+                requesterId,
+                limit,
+                offset,
+                includeDeleted
+        );
+
+        // ─────────────────────────────────────────────
+        // 2. (Optional) Convert profile_picture URLs to absolute if needed
+        //    - UserView.profilePicture contains RELATIVE path from Auth Service
+        //    - Uncomment below if frontend needs absolute URLs:
+        // List<UserView> enrichedUsers = convertUserViewProfileUrls(users, request);
+        // ─────────────────────────────────────────────
+
+        logger.info(
+                "Successfully returned {} users available to add to group: room_id={}, requester_id={}",
+                users.size(), roomId, requesterId
+        );
+
+        return ResponseEntity.ok(users);
+    }
+
+    // ─────────────────────────────────────────────────────────────────
     // SINGLE ROOM DETAIL (Authenticated User - Room Settings/Detail View)
     // ─────────────────────────────────────────────────────────────────
 

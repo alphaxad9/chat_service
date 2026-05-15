@@ -565,4 +565,35 @@ public interface MessageCommandServiceInterface {
      * skip (not fail) messages where the transition is invalid or unauthorized.</p>
      */
     int bulkUpdateStatus(Collection<UUID> messageIds, Message.Status newStatus, UUID actorId);
+        /**
+     * Bulk mark all active messages in a room as RECEIVED for a specific receiver.
+     *
+     * <p>Service loads all active message aggregates for the room, verifies that the actor
+     * is the intended receiver for each message (NOT the sender), applies domain logic
+     * to transition status to RECEIVED where valid, and persists updated state.</p>
+     *
+     * <p><strong>Behavior:</strong>
+     * <ul>
+     *   <li>Only processes active (non-deleted) messages where actorId matches the message receiverId</li>
+     *   <li>Skips messages where actor is the sender (only receiver can mark as received)</li>
+     *   <li>Skips messages already in RECEIVED or SEEN state (idempotent operation)</li>
+     *   <li>Logs warnings for skipped messages but continues processing remaining messages</li>
+     *   <li>Fail-soft: partial success is possible if some messages fail validation</li>
+     * </ul></p>
+     *
+     * @param roomId the UUID of the room containing messages to mark as received
+     * @param actorId the UUID of the user marking messages as received (must be the receiver, not sender)
+     * @return count of messages that were successfully transitioned to RECEIVED status
+     *
+     * <p><strong>Use cases:</strong>
+     * <ul>
+     *   <li>User opens a chat room — automatically mark all pending messages as delivered</li>
+     *   <li>Background job synchronizing delivery status across devices</li>
+     *   <li>Reconnection logic after network interruption</li>
+     * </ul></p>
+     *
+     * <p><strong>Note:</strong> This operation does NOT mark messages as SEEN — use a separate
+     * bulk operation or individual {@link #markAsSeen(UUID, UUID)} calls for read receipts.</p>
+     */
+    int bulkMarkAsReceivedInRoom(UUID roomId, UUID actorId);
 }

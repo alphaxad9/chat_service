@@ -1403,4 +1403,114 @@ public class MessageCommandServiceImpl implements MessageCommandServiceInterface
             throw e;
         }
     }
+    @Override
+    public int bulkMarkAsReceivedInRoom(UUID roomId, UUID actorId) {
+        try {
+            // Load all active messages in the room
+            List<MessageAggregate> aggregates = messageCommandRepository.bulkLoadActiveByRoomId(roomId);
+            logger.debug(
+                "Loaded {} active messages for bulk markAsReceived: room_id={}, actor_id={}",
+                aggregates.size(),
+                roomId,
+                actorId
+            );
+
+            int successCount = 0;
+            int skippedCount = 0;
+
+            for (MessageAggregate aggregate : aggregates) {
+                try {
+                    // Apply domain logic to mark as received
+                    // Domain aggregate handles authorization: only receiver (not sender) can mark as received
+                    aggregate.markAsReceived(actorId);
+                    
+                    // Persist the updated aggregate
+                    messageCommandRepository.save(aggregate);
+                    
+                    successCount++;
+                    logger.trace(
+                        "Successfully marked message as RECEIVED (bulk): message_id={}, room_id={}, actor_id={}, status={}",
+                        aggregate.message().id(),
+                        roomId,
+                        actorId,
+                        aggregate.message().status()
+                    );
+
+                } catch (MessageUnauthorizedError e) {
+                    // Expected: actor is sender, not receiver — skip silently
+                    logger.trace(
+                        "Skipped message (unauthorized - actor is sender): message_id={}, room_id={}, actor_id={}",
+                        e.getMessageId(),
+                        roomId,
+                        actorId
+                    );
+                    skippedCount++;
+
+                } catch (MessageStateTransitionError e) {
+                    // Expected: message already in RECEIVED/SEEN state — skip silently
+                    logger.trace(
+                        "Skipped message (invalid state transition): message_id={}, room_id={}, current={}, target={}, reason={}",
+                        e.getMessageId(),
+                        roomId,
+                        e.getCurrentState(),
+                        e.getTargetState(),
+                        e.getReason()
+                    );
+                    skippedCount++;
+
+                } catch (MessageOperationNotAllowedError e) {
+                    // Expected: message deleted or inactive — skip silently
+                    logger.trace(
+                        "Skipped message (operation not allowed): message_id={}, room_id={}, operation={}, reason={}",
+                        e.getMessageId(),
+                        roomId,
+                        e.getOperation(),
+                        e.getReason()
+                    );
+                    skippedCount++;
+
+                } catch (MessageDomainError e) {
+                    // Log but continue processing other messages
+                    logger.warn(
+                        "Domain error marking message as received (bulk, non-blocking): message_id={}, room_id={}, actor_id={}, error={}",
+                        aggregate.message().id(),
+                        roomId,
+                        actorId,
+                        e.getMessage()
+                    );
+                    skippedCount++;
+
+                } catch (Exception e) {
+                    // Log but continue processing other messages
+                    logger.warn(
+                        "Unexpected error marking message as received (bulk, non-blocking): message_id={}, room_id={}, actor_id={}, error={}",
+                        aggregate.message().id(),
+                        roomId,
+                        actorId,
+                        e.getMessage()
+                    );
+                    skippedCount++;
+                }
+            }
+
+            logger.info(
+                "Bulk markAsReceived completed: room_id={}, actor_id={}, success={}, skipped={}, total={}",
+                roomId,
+                actorId,
+                successCount,
+                skippedCount,
+                aggregates.size()
+            );
+            return successCount;
+
+        } catch (Exception e) {
+            logger.error(
+                "Unexpected error during bulkMarkAsReceivedInRoom: room_id={}, actor_id={}",
+                roomId,
+                actorId,
+                e
+            );
+            throw e;
+        }
+    }
 }

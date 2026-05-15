@@ -290,3 +290,35 @@ curl -X GET "http://127.0.0.1:8005/api/query/rooms/users-for-conversation" \
   --cookie "access_token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzc4NjYwOTU3LCJpYXQiOjE3Nzg2NjA2NTcsImp0aSI6ImM0YTAwZmVjYTM2ODQ2MzhiOGZlOWM3YWU2ODBiYTVkIiwidXNlcl9pZCI6IjBiZWFmMDVmLTNmNDUtNDY2Zi04OTEzLTlmMjE4YjBkNzg4NCJ9.dOCn9scpo2ZJxcdrMcG-atlX-OAJ941P8mQ1ZEqPZvc2_3mJiYBNZtvyjf1Cm2K_ychbnibOp9KnAPrVkWW0_jshCR_m-HuiWzt5cuMR4Q0DHNE9Ntk6E1EB2v3xD3HG2JvCFv9uSVYEo5fge6hHYSNhRtRx3KMGTyTZf6iISaVKVwwkpXhTlX9VTkhl8qj-xMIPzhbops9ot4mhnN-wxF3kb89jGejsmDpyoF4Ll_EcWOtGS6J4RZEurRIYu47u_e0-jCP6mulcM_8HwPGDmbmJODlKIHL4t_sRMwi_YXjnEN6Som6HeVYvdNlvtKT6OT-Kn5qfLY5X2D8VJkwQaQ" \
   | jq
 
+
+
+# =============================================================================
+# ROOM QUERY API - USERS TO ADD TO GROUP CURL TEST COMMANDS
+# =============================================================================
+# Base URL: http://127.0.0.1:8005
+# Auth: JWT token via --cookie "access_token=..."
+# All responses piped through jq for pretty JSON formatting
+# 
+# 🔑 Replace {room_id} with an actual GROUP room UUID from previous creation responses
+# 🔑 Replace access_token values with fresh tokens from /zedvye_one/users/token/ endpoint
+# =============================================================================
+
+# ───────────────────────────────────────────────────────────────────────────
+# 7. GET USERS AVAILABLE TO ADD TO A GROUP ROOM
+# ───────────────────────────────────────────────────────────────────────────
+
+# Fetch users available to add to a specific GROUP room
+# ✅ Returns: Auth Service users EXCLUDING existing room members + requester (deduplicated)
+# ✅ Use this response to populate "Add Members" UI in group settings
+# ✅ Query params: limit (default: 20), offset (default: 0), include_deleted (default: false)
+curl -X GET "http://127.0.0.1:8005/api/query/rooms/baac4bda-9a74-491a-9241-b16ec1914cd2/users-to-add?limit=20&offset=0&include_deleted=false" \
+  -H "Accept: application/json" \
+  --cookie "access_token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzc4NjY0Mjg1LCJpYXQiOjE3Nzg2NjM5ODUsImp0aSI6ImZiYzNmMDdmNjI1MjQyZDJiZGZiYWU0ZTFmM2IzYjBkIiwidXNlcl9pZCI6IjcxODg1YmJlLTFmNDgtNDJiNi05MGU3LWY5ODhhZjUyMzFkZCJ9.gkRIj8Pbh3ebIC_6XJ1QypW6obBpEAX5ZcdP8Hj7roTUVSxsWTl_Xy7Ao4agsLMY0WdayiLoqWBM_2ZX-qmyY_IePRjbDMZsNMN3Bx-3TPWx6WCIHP8rXXC_Hp8oFRfvHKZa0v9eHI4EYhU0jSU_-t4tliNsQMh0I1f8Ql_ZGR2yCsMwmhKLwq8NRBHJh-1Ngtyjxm8FYZjmmnIut_ccSk5rKKJiaxrnnMGpXj8YYSCh-H-hrJQPmQ7v9oE214u646C8QJqQSYew9vSE_xW_LOVeR4NrkZBnm_TtsqQFhKBoKp1fRownSBd-7QB3Jh3p8wVnKfPN55iykcT2sY9GdA" \
+  | jq
+
+# Fetch users with custom pagination (limit=10, offset=10)
+curl -X GET "http://127.0.0.1:8005/api/query/rooms/baac4bda-9a74-491a-9241-b16ec1914cd2/users-to-add?limit=10&offset=10&include_deleted=false" \
+  -H "Accept: application/json" \
+  --cookie "access_token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzc4ODI5MjEwLCJpYXQiOjE3Nzg4Mjg5MTAsImp0aSI6IjlhZWQ0YjJiYWMzNzQ2NDZhYjI2Yzg2YTBjMDU3NmIyIiwidXNlcl9pZCI6IjcxODg1YmJlLTFmNDgtNDJiNi05MGU3LWY5ODhhZjUyMzFkZCJ9.ePDBgGNhOzjNB8Ua57FBo8XCdJKPLqMHl23waxxgP29yCkki6BwslAYHdSMcsGW7wN08H6osqGT0y-mvH1Tn4HaClKyrglK1_RMtxHjS6SPi94Rykihe-92d4iv-LOqHU44I5yGwLY3Vzl12AG2eQYcAg36IY4qg9Hea18hdQlitCVnVgX4zrZQgtEESz42O1oQ_nHR3vG2fQx6UXTap8Y0fSv-sLWaEpJtlF4VOXHHLRANlDnc0_SBGrK1r3MofLVGn9AndDyIurCz0az3k5-IxjkEJEJhE9KTbHaGaLUnIRSmsYYfdjOCuXal6OH86Rr1niAOg-Ahko1hlgqDU4Q" \
+  | jq
+

@@ -12,7 +12,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import com.example.chat_service.application.messages.handlers.dtos.MessageQueryResponseDTO;
+import com.example.chat_service.application.messages.services.MessageCommandServiceInterface;
 import com.example.chat_service.application.messages.services.MessageQueryServiceInterface;
+import com.example.chat_service.application.members.services.MemberCommandServiceInterface;
+import com.example.chat_service.domain.members.MemberAggregate;
 import com.example.chat_service.domain.messages.Message;
 import com.example.chat_service.external.users.dtos.UserView;
 import com.example.chat_service.external.users.dtos.users.services.UserApiClient;
@@ -27,6 +30,7 @@ import com.example.chat_service.external.users.dtos.users.services.UserApiClient
  *   <li>Build reply context (ParentPreview) for threaded conversations</li>
  *   <li>Construct {@link MessageQueryResponseDTO} for API responses</li>
  *   <li>Calculate {@code is_mine} flag based on requester_id vs sender_id</li>
+ *   <li>Automatically mark all messages as read/seen for the requester when querying a room</li>
  * </ul>
  * </p>
  *
@@ -49,6 +53,13 @@ import com.example.chat_service.external.users.dtos.users.services.UserApiClient
  *
  * <p><strong>Personalization:</strong> When {@code requester_id} matches the message {@code sender_id},
  * the {@code sender_username} field is set to "You" for personalized UX.</p>
+ *
+ * <p><strong>Read receipt automation:</strong> When querying messages for a room, the handler:
+ * <ol>
+ *   <li>Loads the member aggregate and calls {@code markAllRead} to clear unread counts at member level</li>
+ *   <li>Iterates through each loaded message and calls {@code markAsSeen} to update individual message state</li>
+ * </ol>
+ * This ensures that loading messages implies the user has seen them at both aggregate and entity levels.</p>
  */
 @Component
 public class MessageQueryHandler {
@@ -57,21 +68,29 @@ public class MessageQueryHandler {
             LoggerFactory.getLogger(MessageQueryHandler.class);
 
     private final MessageQueryServiceInterface messageQueryService;
+    private final MessageCommandServiceInterface messageCommandService;
     private final UserApiClient userApiClient;
+    private final MemberCommandServiceInterface memberCommandService;
 
     /**
      * Constructor injection — Spring will auto-wire all dependencies
      * because they're annotated with @Component or @Service.
      *
      * @param messageQueryService handles read-side message queries
+     * @param messageCommandService handles write-side message commands (e.g., markAsSeen)
      * @param userApiClient fetches user data from external Auth Service
+     * @param memberCommandService handles member command operations (e.g., markAllRead)
      */
     public MessageQueryHandler(
             MessageQueryServiceInterface messageQueryService,
-            UserApiClient userApiClient
+            MessageCommandServiceInterface messageCommandService,
+            UserApiClient userApiClient,
+            MemberCommandServiceInterface memberCommandService
     ) {
         this.messageQueryService = messageQueryService;
+        this.messageCommandService = messageCommandService;
         this.userApiClient = userApiClient;
+        this.memberCommandService = memberCommandService;
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -83,7 +102,10 @@ public class MessageQueryHandler {
      *
      * <p>Flow:
      * <ol>
+     *   <li>Load member aggregate for user+room via memberCommandService</li>
+     *   <li>Mark all messages as read at member level via markAllRead (clears unread count)</li>
      *   <li>Query active messages by room_id via messageQueryService</li>
+     *   <li>For each message, call markAsSeen to update individual message state</li>
      *   <li>For each message, fetch sender username and profile image from Auth Service</li>
      *   <li>If message is a reply, fetch parent message and build ParentPreview</li>
      *   <li>Calculate is_mine by comparing requester_id with message sender_id</li>
@@ -107,6 +129,11 @@ public class MessageQueryHandler {
      * </ul>
      * </p>
      *
+     * <p><strong>Read receipt note:</strong> This method automatically marks all messages as read/seen
+     * for the requester before returning them. Both member-level (markAllRead) and message-level
+     * (markAsSeen) operations are performed. If any read receipt operation fails, the error is
+     * logged but the message query continues (fail-soft behavior).</p>
+     *
      * @param roomId the room UUID to query messages from
      * @param requesterId the UUID of the user requesting the messages (for is_mine calculation)
      * @return List of MessageQueryResponseDTO ready for HTTP response (with relative image paths)
@@ -121,6 +148,26 @@ public class MessageQueryHandler {
         );
 
         // ─────────────────────────────────────────────
+        // 0a. Mark all messages as read at MEMBER level
+        //    - Load member aggregate, then call markAllRead
+        //    - This clears the unread count for the member in this room
+        //    - Fail-soft: log errors but continue with message query
+        // ─────────────────────────────────────────────
+        try {
+            MemberAggregate memberAggregate = memberCommandService.loadAggregateByUserAndRoom(requesterId, roomId);
+            memberCommandService.markAllRead(memberAggregate.member().id(), requesterId);
+            logger.debug(
+                    "Successfully marked all messages as read at member level: user_id={}, room_id={}, member_id={}",
+                    requesterId, roomId, memberAggregate.member().id()
+            );
+        } catch (Exception e) {
+            logger.warn(
+                    "Failed to mark messages as read at member level (non-blocking): user_id={}, room_id={}, error={}",
+                    requesterId, roomId, e.getMessage()
+            );
+        }
+
+        // ─────────────────────────────────────────────
         // 1. Query active messages from service layer
         //    - Returns domain Message entities (active only, excludes deleted)
         // ─────────────────────────────────────────────
@@ -129,6 +176,27 @@ public class MessageQueryHandler {
                 "Retrieved {} active messages for room: room_id={}",
                 messages.size(), roomId
         );
+
+        // ─────────────────────────────────────────────
+        // 0b. Mark each individual message as SEEN at MESSAGE level
+        //    - Iterate through loaded messages and call markAsSeen on each
+        //    - This updates the seen_at timestamp and status for each message entity
+        //    - Fail-soft: log errors per message but continue processing
+        // ─────────────────────────────────────────────
+        for (Message message : messages) {
+            try {
+                messageCommandService.markAsSeen(message.id(), requesterId);
+                logger.trace(
+                        "Marked individual message as seen: message_id={}, room_id={}, user_id={}",
+                        message.id(), roomId, requesterId
+                );
+            } catch (Exception e) {
+                logger.warn(
+                        "Failed to mark individual message as seen (non-blocking): message_id={}, room_id={}, user_id={}, error={}",
+                        message.id(), roomId, requesterId, e.getMessage()
+                );
+            }
+        }
 
         // ─────────────────────────────────────────────
         // 2. Enrich each message with external data and build DTOs
