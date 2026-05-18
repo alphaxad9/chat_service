@@ -1,5 +1,3 @@
-// chat_service/src/main/java/com/example/chat_service/api/chat/MessageQueryController.java
-
 package com.example.chat_service.api.chat;
 
 import java.util.List;
@@ -34,9 +32,12 @@ import jakarta.servlet.http.HttpServletRequest;
  * </p>
  *
  * <p><strong>Image URL handling:</strong>
- * <p>The handler returns DTOs with RELATIVE image paths (e.g., {@code /uploads/messages/abc.jpg}).
- * This controller converts them to ABSOLUTE URLs using {@code MediaUrlService} before sending
- * the HTTP response, ensuring frontend-ready URLs without polluting the domain layer.</p>
+ * <p>The handler returns DTOs with image URLs that may be:
+ * <ul>
+ *   <li><strong>Relative paths</strong> (e.g., {@code /uploads/messages/abc.jpg}) for message images from Chat Service → convert to absolute using Chat Service base URL (port 8005)</li>
+ *   <li><strong>Absolute URLs</strong> (e.g., {@code http://127.0.0.1:8000/media/...}) for sender profile images from Auth Service (port 8000) → leave unchanged</li>
+ * </ul>
+ * This controller uses {@code makeAbsoluteUrl()} to intelligently handle both cases before sending the HTTP response.</p>
  *
  * <pre>{@code
  * // Response example for message list:
@@ -52,7 +53,7 @@ import jakarta.servlet.http.HttpServletRequest;
  *     "is_mine": true,
  *     "status": "SEEN",
  *     "sender_username": "You",
- *     "sender_profile_image": "http://127.0.0.1:8005/uploads/users/profile/xyz.jpg",
+ *     "sender_profile_image": "http://127.0.0.1:8000/media/users/profile/xyz.jpg",
  *     "has_image": true,
  *     "is_deleted": false,
  *     "updated_at": "2024-01-15T10:30:00Z",
@@ -103,7 +104,8 @@ public class MessageQueryController {
      *   <li>Messages are ordered by {@code created_at} ascending (oldest first) for chat history</li>
      *   <li>Deleted messages ({@code is_deleted=true}) are excluded from results</li>
      *   <li>Reply messages include {@code parent_preview} with image-over-text priority</li>
-     *   <li>All image URLs are absolute (converted from relative paths stored in domain)</li>
+     *   <li>Message images use Chat Service base URL (port 8005)</li>
+     *   <li>Sender profile images use Auth Service base URL (port 8000) - preserved as-is</li>
      * </ul>
      * </p>
      *
@@ -115,7 +117,7 @@ public class MessageQueryController {
      * </p>
      *
      * @param roomId the UUID of the room to query messages from (path variable)
-     * @return List of MessageQueryResponseDTO with absolute image URLs, ordered by creation time
+     * @return List of MessageQueryResponseDTO with properly formatted image URLs, ordered by creation time
      */
     @GetMapping(
             path = "/room/{room_id}",
@@ -139,7 +141,7 @@ public class MessageQueryController {
 
         // ─────────────────────────────────────────────
         // 1. Delegate to handler for query + enrichment
-        //    - Handler returns DTOs with RELATIVE image paths
+        //    - Handler returns DTOs with image URLs (relative or absolute)
         // ─────────────────────────────────────────────
         List<MessageQueryResponseDTO> responses = messageQueryHandler.getAllActiveMessagesByRoomId(
                 roomId,
@@ -147,8 +149,7 @@ public class MessageQueryController {
         );
 
         // ─────────────────────────────────────────────
-        // 2. Convert all relative image URLs to absolute URLs
-        //    - Message images, sender profile images, parent preview images
+        // 2. Convert image URLs: preserve absolute (Auth Service), convert relative (Chat Service)
         // ─────────────────────────────────────────────
         List<MessageQueryResponseDTO> enrichedResponses = convertImageUrlsToAbsolute(responses, request);
 
@@ -165,12 +166,12 @@ public class MessageQueryController {
     // ─────────────────────────────────────────────────────────────────
 
     /**
-     * Convert all relative image URLs in a list of MessageQueryResponseDTO to absolute URLs
-     * using the MediaUrlService and the current HTTP request.
+     * Convert all relative image URLs in a list of MessageQueryResponseDTO to absolute URLs.
+     * Absolute URLs (from Auth Service) are preserved as-is.
      *
-     * @param responses the list of DTOs with relative image paths
+     * @param responses the list of DTOs with image URLs (relative or absolute)
      * @param request the current HttpServletRequest for building base URL
-     * @return new list with DTO instances having absolute image URLs
+     * @return new list with DTO instances having properly formatted image URLs
      */
     private List<MessageQueryResponseDTO> convertImageUrlsToAbsolute(
             List<MessageQueryResponseDTO> responses,
@@ -182,11 +183,14 @@ public class MessageQueryController {
     }
 
     /**
-     * Convert all relative image URLs in a single MessageQueryResponseDTO to absolute URLs.
+     * Convert image URLs in a single MessageQueryResponseDTO:
+     * - Message images: relative paths from Chat Service → convert to absolute
+     * - Sender profile images: absolute URLs from Auth Service → preserve as-is
+     * - Parent preview images: relative paths from Chat Service → convert to absolute
      *
-     * @param response the DTO with relative image paths
+     * @param response the DTO with image URLs (relative or absolute)
      * @param request the current HttpServletRequest for building base URL
-     * @return new DTO instance with absolute image URLs
+     * @return new DTO instance with properly formatted image URLs
      */
     private MessageQueryResponseDTO convertSingleResponseUrls(
             MessageQueryResponseDTO response,
@@ -194,27 +198,66 @@ public class MessageQueryController {
     ) {
         MessageQueryResponseDTO updated = response;
 
-        // Convert message image URL
+        // === MESSAGE IMAGE (always from Chat Service - relative path) ===
         if (response.hasImage() && response.imageUrl() != null && !response.imageUrl().isBlank()) {
-            String absoluteImageUrl = mediaUrlService.buildMediaUrl(request, response.imageUrl());
+            String absoluteImageUrl = makeAbsoluteUrl(response.imageUrl(), request);
             updated = updated.withImageUrl(absoluteImageUrl);
-            logger.debug("Converted message image to absolute URL: {}", absoluteImageUrl);
+            logger.debug("Converted message image URL: {} → {}", response.imageUrl(), absoluteImageUrl);
         }
 
-        // Convert sender profile image URL
+        // === SENDER PROFILE IMAGE (from Auth Service - already absolute URL) ===
         if (response.senderProfileImage() != null && !response.senderProfileImage().isBlank()) {
-            String absoluteSenderImage = mediaUrlService.buildMediaUrl(request, response.senderProfileImage());
+            String absoluteSenderImage = makeAbsoluteUrl(response.senderProfileImage(), request);
             updated = updated.withSenderProfileImage(absoluteSenderImage);
-            logger.debug("Converted sender profile image to absolute URL: {}", absoluteSenderImage);
+            logger.debug("Converted sender profile image URL: {} → {}", response.senderProfileImage(), absoluteSenderImage);
         }
 
-        // Convert parent preview image URL (if present)
+        // === PARENT PREVIEW IMAGE (always from Chat Service - relative path) ===
         if (response.parentPreview() != null && response.parentPreview().imageUrl() != null && !response.parentPreview().imageUrl().isBlank()) {
-            String absoluteParentImage = mediaUrlService.buildMediaUrl(request, response.parentPreview().imageUrl());
+            String absoluteParentImage = makeAbsoluteUrl(response.parentPreview().imageUrl(), request);
             updated = updated.withParentImageUrl(absoluteParentImage);
-            logger.debug("Converted parent preview image to absolute URL: {}", absoluteParentImage);
+            logger.debug("Converted parent preview image URL: {} → {}", response.parentPreview().imageUrl(), absoluteParentImage);
         }
 
         return updated;
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // SMART URL HELPER: Fixes the double-URL bug for sender profile images
+    // ─────────────────────────────────────────────────────────────────
+
+    /**
+     * SMART URL BUILDER — This fixes the double URL bug.
+     *
+     * <p>Behavior:
+     * <ul>
+     *   <li>If the URL is already absolute (starts with http:// or https://), return it unchanged.
+     *       This handles sender profile images from Auth Service (port 8000).</li>
+     *   <li>If the URL is a relative path (starts with /), prepend the Chat Service base URL
+     *       using MediaUrlService. This handles message images from Chat Service (port 8005).</li>
+     * </ul>
+     * </p>
+     *
+     * @param url the image URL (may be relative or absolute)
+     * @param request the current HttpServletRequest for building base URL when needed
+     * @return properly formatted absolute URL, or null if input was null/blank
+     */
+    private String makeAbsoluteUrl(String url, HttpServletRequest request) {
+        if (url == null || url.isBlank()) {
+            return null;
+        }
+        String trimmed = url.trim();
+
+        // Already a full URL (e.g. from Auth Service port 8000) → do NOT prepend anything
+        // This prevents the double-URL bug: http://127.0.0.1:8005http://127.0.0.1:8000/...
+        if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+            logger.debug("Preserving absolute URL from Auth Service: {}", trimmed);
+            return trimmed;
+        }
+
+        // Relative path (e.g. /uploads/messages/xxx.jpg) → convert using Chat Service base
+        String converted = mediaUrlService.buildMediaUrl(request, trimmed);
+        logger.debug("Converted relative path to absolute URL: {} → {}", trimmed, converted);
+        return converted;
     }
 }

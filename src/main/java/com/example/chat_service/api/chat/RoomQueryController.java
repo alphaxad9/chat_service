@@ -53,10 +53,12 @@ import jakarta.servlet.http.HttpServletRequest;
  * </p>
  *
  * <p><strong>Image URL handling:</strong>
- * <p>The handler returns DTOs with RELATIVE image paths (e.g., {@code /uploads/rooms/abc.jpg}
- * or {@code /uploads/users/xyz.jpg}). This controller converts them to ABSOLUTE URLs using
- * {@code MediaUrlService} before sending the HTTP response, ensuring frontend-ready URLs
- * without polluting the domain layer.</p>
+ * <p>The handler returns DTOs with image paths that may be:
+ * <ul>
+ *   <li><strong>Relative paths</strong> (e.g., {@code /uploads/rooms/abc.jpg}) for GROUP rooms from Chat Service → convert to absolute using Chat Service base URL (port 8005)</li>
+ *   <li><strong>Absolute URLs</strong> (e.g., {@code http://127.0.0.1:8000/media/...}) for PRIVATE/DIRECT rooms from Auth Service (port 8000) → leave unchanged</li>
+ * </ul>
+ * This controller uses {@code makeAbsoluteUrl()} to intelligently handle both cases before sending the HTTP response.</p>
  *
  * <pre>{@code
  * // Response example for room detail (GetRoomByIdDTO):
@@ -131,7 +133,7 @@ public class RoomQueryController {
      *   <li>For GROUP rooms: {@code name} = group name, {@code profile_image_url} = room's profile image</li>
      *   <li>For DIRECT rooms: {@code name} = friend's username, {@code profile_image_url} = friend's profile picture</li>
      *   <li>Last message preview follows "image-over-text" priority: if message has image, {@code content} is {@code null}</li>
-     *   <li>All image URLs are absolute (converted from relative paths stored in domain)</li>
+     *   <li>Image URLs use smart conversion: absolute URLs from Auth Service are preserved, relative paths from Chat Service are converted</li>
      * </ul>
      * </p>
      *
@@ -142,7 +144,7 @@ public class RoomQueryController {
      * </pre>
      * </p>
      *
-     * @return List of MyRoomsHomePageListDto with absolute image URLs, ordered by last activity
+     * @return List of MyRoomsHomePageListDto with properly formatted image URLs, ordered by last activity
      */
     @GetMapping(
             path = "/home",
@@ -162,13 +164,12 @@ public class RoomQueryController {
 
         // ─────────────────────────────────────────────
         // 1. Delegate to handler for query + enrichment
-        //    - Handler returns DTOs with RELATIVE image paths
+        //    - Handler returns DTOs with image URLs that may be relative or absolute
         // ─────────────────────────────────────────────
         List<MyRoomsHomePageListDto> dtos = roomQueryHandler.getRoomsForUserHomePage(userId);
 
         // ─────────────────────────────────────────────
-        // 2. Convert all relative image URLs to absolute URLs
-        //    - Room profile images and last message images
+        // 2. Convert image URLs: preserve absolute (Auth Service), convert relative (Chat Service)
         // ─────────────────────────────────────────────
         List<MyRoomsHomePageListDto> enrichedDtos = convertImageUrlsToAbsolute(dtos, request);
 
@@ -210,7 +211,7 @@ public class RoomQueryController {
      * <ul>
      *   <li>Returns List&lt;UserView&gt; with minimal user data for display</li>
      *   <li>Each UserView includes: user_id, username, email, first_name, last_name, profile_picture</li>
-     *   <li>profile_picture contains RELATIVE path; convert to absolute at controller if needed</li>
+     *   <li>profile_picture contains ABSOLUTE URL from Auth Service → no conversion needed</li>
      *   <li>Results are deduplicated by user_id and exclude the current user</li>
      * </ul>
      * </p>
@@ -270,12 +271,8 @@ public class RoomQueryController {
                 includeDeleted
         );
 
-        // ─────────────────────────────────────────────
-        // 2. (Optional) Convert profile_picture URLs to absolute if needed
-        //    - UserView.profilePicture contains RELATIVE path from Auth Service
-        //    - Uncomment below if frontend needs absolute URLs:
-        // List<UserView> enrichedUsers = convertUserViewProfileUrls(users, request);
-        // ─────────────────────────────────────────────
+        // Note: UserView.profilePicture already contains absolute URLs from Auth Service (port 8000)
+        // No conversion needed here.
 
         logger.info(
                 "Successfully returned {} users for conversation starters: user_id={}",
@@ -309,7 +306,7 @@ public class RoomQueryController {
      * <ul>
      *   <li>Returns List&lt;UserView&gt; with minimal user data for display in "Add Members" UI</li>
      *   <li>Each UserView includes: user_id, username, email, first_name, last_name, profile_picture</li>
-     *   <li>profile_picture contains RELATIVE path; convert to absolute at controller if needed</li>
+     *   <li>profile_picture contains ABSOLUTE URL from Auth Service → no conversion needed</li>
      *   <li>Results are deduplicated by user_id and exclude existing members + requester</li>
      * </ul>
      * </p>
@@ -372,12 +369,8 @@ public class RoomQueryController {
                 includeDeleted
         );
 
-        // ─────────────────────────────────────────────
-        // 2. (Optional) Convert profile_picture URLs to absolute if needed
-        //    - UserView.profilePicture contains RELATIVE path from Auth Service
-        //    - Uncomment below if frontend needs absolute URLs:
-        // List<UserView> enrichedUsers = convertUserViewProfileUrls(users, request);
-        // ─────────────────────────────────────────────
+        // Note: UserView.profilePicture already contains absolute URLs from Auth Service (port 8000)
+        // No conversion needed here.
 
         logger.info(
                 "Successfully returned {} users available to add to group: room_id={}, requester_id={}",
@@ -405,11 +398,11 @@ public class RoomQueryController {
      * <p><strong>Response notes:</strong>
      * <ul>
      *   <li>For GROUP rooms: includes {@code description}, {@code cover_image_url}, {@code type="GROUP"}</li>
-     *   <li>For DIRECT rooms: {@code name} = other participant's username, {@code profile_image_url} = their picture, {@code description=null}, {@code cover_image_url=null}, {@code type="DIRECT"}</li>
+     *   <li>For DIRECT rooms: {@code name} = other participant's username, {@code profile_image_url} = their picture (absolute URL from Auth Service), {@code description=null}, {@code cover_image_url=null}, {@code type="DIRECT"}</li>
      *   <li>{@code is_admin} reflects the requesting user's membership status (ADMIN/USER)</li>
      *   <li>{@code is_owner} is true only if the requesting user created the room</li>
      *   <li>All timestamps are ISO-8601 formatted strings</li>
-     *   <li>All image URLs are absolute (converted from relative paths)</li>
+     *   <li>Image URLs use smart conversion: absolute URLs preserved, relative paths converted</li>
      * </ul>
      * </p>
      *
@@ -446,7 +439,7 @@ public class RoomQueryController {
         // ─────────────────────────────────────────────
         // 1. Delegate to handler for query + authorization
         //    - Handler returns Optional.empty() if not found or not authorized
-        //    - DTO contains RELATIVE image paths
+        //    - DTO contains image URLs that may be relative or absolute
         // ─────────────────────────────────────────────
         Optional<GetRoomByIdDTO> dtoOpt = roomQueryHandler.getRoomById(roomId, userId);
 
@@ -459,8 +452,7 @@ public class RoomQueryController {
         }
 
         // ─────────────────────────────────────────────
-        // 2. Convert relative image URLs to absolute URLs
-        //    - Profile image and cover image (GROUP rooms only have cover)
+        // 2. Convert image URLs: preserve absolute (Auth Service), convert relative (Chat Service)
         // ─────────────────────────────────────────────
         GetRoomByIdDTO dto = dtoOpt.get();
         GetRoomByIdDTO enrichedDto = convertGetRoomDtoUrls(dto, request);
@@ -480,10 +472,11 @@ public class RoomQueryController {
     /**
      * Convert all relative image URLs in a list of MyRoomsHomePageListDto to absolute URLs
      * using the MediaUrlService and the current HTTP request.
+     * Absolute URLs (from Auth Service) are preserved as-is.
      *
-     * @param dtos the list of DTOs with relative image paths
+     * @param dtos the list of DTOs with image URLs (relative or absolute)
      * @param request the current HttpServletRequest for building base URL
-     * @return new list with DTO instances having absolute image URLs
+     * @return new list with DTO instances having properly formatted image URLs
      */
     private List<MyRoomsHomePageListDto> convertImageUrlsToAbsolute(
             List<MyRoomsHomePageListDto> dtos,
@@ -495,11 +488,13 @@ public class RoomQueryController {
     }
 
     /**
-     * Convert all relative image URLs in a single MyRoomsHomePageListDto to absolute URLs.
+     * Convert image URLs in a single MyRoomsHomePageListDto:
+     * - If URL is already absolute (http/https), preserve it (PRIVATE/DIRECT rooms from Auth Service)
+     * - If URL is relative, convert to absolute using MediaUrlService (GROUP rooms from Chat Service)
      *
-     * @param dto the DTO with relative image paths
+     * @param dto the DTO with image URLs (relative or absolute)
      * @param request the current HttpServletRequest for building base URL
-     * @return new DTO instance with absolute image URLs
+     * @return new DTO instance with properly formatted image URLs
      */
     private MyRoomsHomePageListDto convertSingleDtoUrls(
             MyRoomsHomePageListDto dto,
@@ -507,19 +502,19 @@ public class RoomQueryController {
     ) {
         MyRoomsHomePageListDto updated = dto;
 
-        // Convert room profile image URL
+        // === PROFILE IMAGE (GROUP or PRIVATE) ===
         if (dto.hasProfileImage() && dto.profileImageUrl() != null && !dto.profileImageUrl().isBlank()) {
-            String absoluteProfileUrl = mediaUrlService.buildMediaUrl(request, dto.profileImageUrl());
-            updated = updated.withProfileImageUrl(absoluteProfileUrl);
-            logger.debug("Converted room profile image to absolute URL: {}", absoluteProfileUrl);
+            String absoluteUrl = makeAbsoluteUrl(dto.profileImageUrl(), request);
+            updated = updated.withProfileImageUrl(absoluteUrl);
+            logger.debug("Converted profile image URL: {} → {}", dto.profileImageUrl(), absoluteUrl);
         }
 
-        // Convert last message image URL (if present and has image)
-        if (dto.lastMessage() != null && dto.lastMessage().hasImage() 
+        // === LAST MESSAGE IMAGE (always from Chat Service - relative path) ===
+        if (dto.lastMessage() != null && dto.lastMessage().hasImage()
                 && dto.lastMessage().imageUrl() != null && !dto.lastMessage().imageUrl().isBlank()) {
-            String absoluteMessageImageUrl = mediaUrlService.buildMediaUrl(request, dto.lastMessage().imageUrl());
-            updated = updated.withLastMessageImageUrl(absoluteMessageImageUrl);
-            logger.debug("Converted last message image to absolute URL: {}", absoluteMessageImageUrl);
+            String absoluteUrl = makeAbsoluteUrl(dto.lastMessage().imageUrl(), request);
+            updated = updated.withLastMessageImageUrl(absoluteUrl);
+            logger.debug("Converted last message image URL: {} → {}", dto.lastMessage().imageUrl(), absoluteUrl);
         }
 
         return updated;
@@ -530,12 +525,13 @@ public class RoomQueryController {
     // ─────────────────────────────────────────────────────────────────
 
     /**
-     * Convert all relative image URLs in a GetRoomByIdDTO to absolute URLs
-     * using the MediaUrlService and the current HTTP request.
+     * Convert image URLs in a GetRoomByIdDTO:
+     * - If URL is already absolute (http/https), preserve it (PRIVATE/DIRECT rooms from Auth Service)
+     * - If URL is relative, convert to absolute using MediaUrlService (GROUP rooms from Chat Service)
      *
-     * @param dto the DTO with relative image paths
+     * @param dto the DTO with image URLs (relative or absolute)
      * @param request the current HttpServletRequest for building base URL
-     * @return new DTO instance with absolute image URLs
+     * @return new DTO instance with properly formatted image URLs
      */
     private GetRoomByIdDTO convertGetRoomDtoUrls(
             GetRoomByIdDTO dto,
@@ -543,56 +539,85 @@ public class RoomQueryController {
     ) {
         GetRoomByIdDTO updated = dto;
 
-        // Convert profile image URL (used for GROUP room avatar or DIRECT room friend's profile)
+        // Convert profile image URL (GROUP: relative path, DIRECT: absolute URL from Auth Service)
         if (dto.hasProfileImage() && dto.profileImageUrl() != null && !dto.profileImageUrl().isBlank()) {
-            String absoluteProfileUrl = mediaUrlService.buildMediaUrl(request, dto.profileImageUrl());
-            updated = updated.withProfileImageUrl(absoluteProfileUrl);
-            logger.debug("Converted profile image to absolute URL: {}", absoluteProfileUrl);
+            String absoluteUrl = makeAbsoluteUrl(dto.profileImageUrl(), request);
+            updated = updated.withProfileImageUrl(absoluteUrl);
+            logger.debug("Converted profile image URL: {} → {}", dto.profileImageUrl(), absoluteUrl);
         }
 
-        // Convert cover image URL (GROUP rooms only - DIRECT rooms have null cover)
+        // Convert cover image URL (GROUP rooms only - always relative path from Chat Service)
         if (dto.hasCoverImage() && dto.coverImageUrl() != null && !dto.coverImageUrl().isBlank()) {
-            String absoluteCoverUrl = mediaUrlService.buildMediaUrl(request, dto.coverImageUrl());
-            updated = updated.withCoverImageUrl(absoluteCoverUrl);
-            logger.debug("Converted cover image to absolute URL: {}", absoluteCoverUrl);
+            String absoluteUrl = makeAbsoluteUrl(dto.coverImageUrl(), request);
+            updated = updated.withCoverImageUrl(absoluteUrl);
+            logger.debug("Converted cover image URL: {} → {}", dto.coverImageUrl(), absoluteUrl);
         }
 
         return updated;
     }
 
     // ─────────────────────────────────────────────────────────────────
-    // HELPER METHODS: URL Conversion for UserView (Optional)
+    // SMART URL HELPER: Fixes the double-URL bug for private rooms
+    // ─────────────────────────────────────────────────────────────────
+
+    /**
+     * SMART URL BUILDER — This fixes the double URL bug.
+     *
+     * <p>Behavior:
+     * <ul>
+     *   <li>If the URL is already absolute (starts with http:// or https://), return it unchanged.
+     *       This handles PRIVATE/DIRECT room images that come from Auth Service (port 8000).</li>
+     *   <li>If the URL is a relative path (starts with /), prepend the Chat Service base URL
+     *       using MediaUrlService. This handles GROUP room images from Chat Service (port 8005).</li>
+     * </ul>
+     * </p>
+     *
+     * @param url the image URL (may be relative or absolute)
+     * @param request the current HttpServletRequest for building base URL when needed
+     * @return properly formatted absolute URL, or null if input was null/blank
+     */
+    private String makeAbsoluteUrl(String url, HttpServletRequest request) {
+        if (url == null || url.isBlank()) {
+            return null;
+        }
+        String trimmed = url.trim();
+
+        // Already a full URL (e.g. from Auth Service port 8000) → do NOT prepend anything
+        // This prevents the double-URL bug: http://127.0.0.1:8005http://127.0.0.1:8000/...
+        if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+            logger.debug("Preserving absolute URL from Auth Service: {}", trimmed);
+            return trimmed;
+        }
+
+        // Relative path (e.g. /uploads/groups/profile/xxx.jpg) → convert using Chat Service base
+        String converted = mediaUrlService.buildMediaUrl(request, trimmed);
+        logger.debug("Converted relative path to absolute URL: {} → {}", trimmed, converted);
+        return converted;
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // HELPER METHODS: URL Conversion for UserView (Optional - Not Needed)
     // ─────────────────────────────────────────────────────────────────
 
     /**
      * Convert all relative profile_picture URLs in a list of UserView to absolute URLs.
      *
-     * <p>Optional helper - uncomment usage in getUsersForNewConversation if frontend
-     * needs absolute URLs for profile pictures.</p>
+     * <p><strong>NOTE:</strong> This helper is NOT needed for this application because
+     * {@code UserView.profilePicture} already returns absolute URLs from the Auth Service (port 8000).
+     * Calling {@code makeAbsoluteUrl()} on these would incorrectly prepend the Chat Service base URL.
+     * This method is kept for reference only.</p>
      *
-     * @param users the list of UserView with relative profile_picture paths
-     * @param request the current HttpServletRequest for building base URL
-     * @return new list with UserView instances having absolute profile_picture URLs
+     * @param users the list of UserView with profile_picture URLs
+     * @param request the current HttpServletRequest (unused - URLs already absolute)
+     * @return the same list (no conversion needed)
      */
     @SuppressWarnings("unused")
     private List<UserView> convertUserViewProfileUrls(
             List<UserView> users,
             HttpServletRequest request
     ) {
-        if (users == null || users.isEmpty()) {
-            return users;
-        }
-
-        return users.stream()
-                .map(user -> {
-                    if (user.profilePicture() != null && !user.profilePicture().isBlank()) {
-                        String absoluteUrl = mediaUrlService.buildMediaUrl(request, user.profilePicture());
-                        // Note: UserView is immutable record, so we'd need a withProfilePicture method
-                        // or reconstruct. For now, return as-is and let frontend prepend base URL.
-                        // If needed, add a withProfilePicture method to UserView record.
-                    }
-                    return user;
-                })
-                .toList();
+        // UserView.profilePicture already contains absolute URLs from Auth Service (port 8000)
+        // No conversion needed - return as-is to avoid double-URL bug
+        return users;
     }
 }
